@@ -1,0 +1,67 @@
+{
+  "name": "boilerplate-nodejs",
+  "version": "1.0.0",
+  "description": "Este repositorio es tu punto de partida ideal para proyectos de Node.js. Está equipado con herramientas modernas para optimizar y mejorar tu experiencia de desarrollo.",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "build:dev": "tsc --watch",
+    "start": "node dist",
+    "start:dev": "node --watch dist",
+    "lint": "eslint 'src/**/*.ts' --fix",
+    "prepare": "husky install",
+    "test:dev": "jest --watchAll",
+    "test:coverage": "jest --coverage",
+    "test": "jest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WebDevWhispers/Boilerplate-NodeJS.git"
+  },
+  "keywords": [
+    "JS",
+    "NodeJS"
+  ],
+  "author": "WebDevWhispers",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/WebDevWhispers/Boilerplate-NodeJS/issues"
+  },
+  "homepage": "https://github.com/WebDevWhispers/Boilerplate-NodeJS#readme",
+  "dependencies": {
+    "agenda": "^5.0.0",
+    "bcrypt": "^5.1.1",
+    "dotenv": "^16.3.1",
+    "ejs": "^3.1.10",
+    "express": "^4.21.2",
+    "joi": "^17.13.3",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.10.0",
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^17.7.1",
+    "@commitlint/config-conventional": "^17.7.0",
+    "@types/bcrypt": "^5.0.2",
+    "@types/express": "^4.17.18",
+    "@types/jest": "^29.5.5",
+    "@types/jsonwebtoken": "^9.0.6",
+    "@types/node": "^20.8.4",
+    "@types/supertest": "^2.0.14",
+    "@typescript-eslint/eslint-plugin": "^6.7.5",
+    "@typescript-eslint/parser": "^6.7.5",
+    "eslint": "^8.51.0",
+    "eslint-config-prettier": "^9.0.0",
+    "eslint-config-xo": "^0.43.1",
+    "eslint-config-xo-typescript": "^1.0.1",
+    "fs-extra": "^11.2.0",
+    "husky": "^8.0.3",
+    "jest": "^29.7.0",
+    "jest-ts-webcompat-resolver": "^1.0.0",
+    "lint-staged": "^15.4.3",
+    "prettier": "^3.0.3",
+    "supertest": "^6.3.3",
+    "ts-jest": "^29.1.1",
+    "typescript": "^5.2.2"
+  }
+}

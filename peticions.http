@@ -1,0 +1,6 @@
+localhost:3000/api/v1/recipes
+
+###
+POST localhost:3000/api/v1/users
+
+```
