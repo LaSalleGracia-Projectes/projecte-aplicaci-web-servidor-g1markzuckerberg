@@ -1,30 +1,50 @@
 import { type Request, type Response, type NextFunction } from 'express';
-import httpStatus from '../config/httpStatusCodes.js';
-import { createUserService } from '../../services/userService.js';
+import { findUserByEmail, createUser } from '../../services/supabaseService.js';
 import type UserI from '../../types/UserI.js';
 import bcrypt from 'bcrypt';
+import httpStatus from '../config/httpStatusCodes.js';
 
-const register = async (req: Request, res: Response, next: NextFunction) => {
+// 🔹 Obtener usuario por email
+const getUser = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    const { correo } = req.params;
+    const user = await findUserByEmail(correo);
 
-    const { email, password } = req.body as { email: string, password: string };
-
-    const hashedPassword: string = await bcrypt.hash(password, 10);
-
-    const user: UserI = {
-      mail: String(email),
-      password: hashedPassword
-    };
-
-    const userCreated = await createUserService(user);
-    if (userCreated) {
-      res.status(httpStatus.ok).send({ userCreated });
-    } else {
-      next('Ups! User not created');
+    if (!user) {
+      return res.status(httpStatus.notFound).send({ error: 'User not found' });
     }
+
+    res.status(httpStatus.ok).send({ user });
   } catch (error) {
     next(error);
   }
-}
+};
 
-export { register};
+// 🔹 Crear usuario
+const register = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { username, correo, password } = req.body as { username: string; correo: string; password: string };
+
+    // Verificar si el usuario ya existe
+    const existingUser = await findUserByEmail(correo);
+    if (existingUser) {
+      return res.status(httpStatus.badRequest).send({ error: 'User with this email already exists' });
+    }
+
+    // Encriptar la contraseña
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const user: UserI = {
+      username,
+      correo,
+      password: hashedPassword
+    };
+
+    const userCreated = await createUser(user);
+    res.status(httpStatus.created).send({ user: userCreated });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export { getUser, register };
