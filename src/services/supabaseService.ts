@@ -72,4 +72,19 @@ const updateUserTokens = async (id: number, tokens: Partial<UserI>): Promise<boo
   }
 };
 
-export { findUserByEmail, findUserById, createUser, updateUserTokens};
+const deleteUserByEmail = async (correo: string): Promise<boolean> => {
+  try {
+    const result = await sql`
+      DELETE FROM ${sql(userTable)}
+      WHERE correo = ${correo}
+      RETURNING id;
+    `;
+
+    return result.length > 0;  // Retorna `true` si se eliminó una fila
+  } catch (error) {
+    console.error(`❌ Error deleting user from database:`, error);
+    return false;
+  }
+};
+
+export { findUserByEmail, findUserById, createUser, updateUserTokens, deleteUserByEmail };
