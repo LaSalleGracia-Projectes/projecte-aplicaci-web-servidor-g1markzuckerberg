@@ -1,50 +1,194 @@
 import { type Request, type Response, type NextFunction } from 'express';
-import { findUserByEmail, createUser } from '../../services/supabaseService.js';
+import { findUserByEmail, createUser, updateUserTokens } from '../../services/supabaseService.js';
 import type UserI from '../../types/UserI.js';
 import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 import httpStatus from '../config/httpStatusCodes.js';
 
-// 🔹 Obtener usuario por email
-const getUser = async (req: Request, res: Response, next: NextFunction) => {
-  try {
-    const { correo } = req.params;
-    const user = await findUserByEmail(correo);
+// Configuración de expiración de tokens
+const webTokenExpiration = '1h';      // 1 hora para token web
+const mobileTokenExpiration = '365d';   // Token móvil con validez prolongada
+const refreshWebTokenExpiration = '7d';    // 7 días para refresh token
 
-    if (!user) {
-      return res.status(httpStatus.notFound).send({ error: 'User not found' });
-    }
+// Función auxiliar para generar tokens
+const generateToken = (user: UserI, expiresIn: string) => 
+  jwt.sign(
+    { id: user.id, correo: user.correo, isAdmin: user.is_admin },
+    process.env.JWT_SECRET_KEY ?? 'secret',
+    { expiresIn }
+  );
 
-    res.status(httpStatus.ok).send({ user });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// 🔹 Crear usuario
-const register = async (req: Request, res: Response, next: NextFunction) => {
+// ──────────────────────────────
+// Registro de usuario para Web
+// ──────────────────────────────
+const registerWeb = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { username, correo, password } = req.body as { username: string; correo: string; password: string };
-
-    // Verificar si el usuario ya existe
     const existingUser = await findUserByEmail(correo);
     if (existingUser) {
       return res.status(httpStatus.badRequest).send({ error: 'User with this email already exists' });
     }
 
-    // Encriptar la contraseña
     const hashedPassword = await bcrypt.hash(password, 10);
-
-    const user: UserI = {
-      username,
-      correo,
-      password: hashedPassword
-    };
-
+    const user: UserI = { username, correo, password: hashedPassword };
     const userCreated = await createUser(user);
-    res.status(httpStatus.created).send({ user: userCreated });
+    if (!userCreated) {
+      return res.status(httpStatus.internalServerError).send({ error: 'User could not be created' });
+    }
+
+    // Generar tokens para web: webToken y refreshToken
+    const webToken = generateToken(userCreated, webTokenExpiration);
+    const refreshWebToken = generateToken(userCreated, refreshWebTokenExpiration);
+    await updateUserTokens(userCreated.id!, { webToken, refreshWebToken });
+
+    res.status(httpStatus.created).send({
+      user: { id: userCreated.id, username, correo },
+      tokens: { webToken, refreshWebToken }
+    });
   } catch (error) {
     next(error);
   }
 };
 
-export { getUser, register };
+// ──────────────────────────────
+// Registro de usuario para Móvil
+// ──────────────────────────────
+const registerMobile = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { username, correo, password } = req.body as { username: string; correo: string; password: string };
+    const existingUser = await findUserByEmail(correo);
+    if (existingUser) {
+      return res.status(httpStatus.badRequest).send({ error: 'User with this email already exists' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const user: UserI = { username, correo, password: hashedPassword };
+    const userCreated = await createUser(user);
+    if (!userCreated) {
+      return res.status(httpStatus.internalServerError).send({ error: 'User could not be created' });
+    }
+
+    // Generar token para móvil (no se utiliza refresh)
+    const mobileToken = generateToken(userCreated, mobileTokenExpiration);
+    await updateUserTokens(userCreated.id!, { mobileToken });
+
+    res.status(httpStatus.created).send({
+      user: { id: userCreated.id, username, correo },
+      tokens: { mobileToken }
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ──────────────────────────────
+// Login de usuario para Web
+// ──────────────────────────────
+const loginWeb = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { correo, password } = req.body as { correo: string; password: string };
+    const user = await findUserByEmail(correo);
+    if (!user || !(await bcrypt.compare(password, user.password!))) {
+      return res.status(httpStatus.unauthorized).send({ error: 'Invalid credentials' });
+    }
+
+    // Generar nuevos tokens para web: webToken y refreshToken
+    const webToken = generateToken(user, webTokenExpiration);
+    const refreshWebToken = generateToken(user, refreshWebTokenExpiration);
+    await updateUserTokens(user.id!, { webToken, refreshWebToken });
+
+    res.status(httpStatus.ok).send({ tokens: { webToken, refreshWebToken } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ──────────────────────────────
+// Login de usuario para Móvil
+// ──────────────────────────────
+const loginMobile = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { correo, password } = req.body as { correo: string; password: string };
+    const user = await findUserByEmail(correo);
+    if (!user || !(await bcrypt.compare(password, user.password!))) {
+      return res.status(httpStatus.unauthorized).send({ error: 'Invalid credentials' });
+    }
+
+    // Generar token para móvil
+    const mobileToken = generateToken(user, mobileTokenExpiration);
+    await updateUserTokens(user.id!, { mobileToken });
+
+    res.status(httpStatus.ok).send({ tokens: { mobileToken } });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ──────────────────────────────
+// Cerrar sesión para Web
+// ──────────────────────────────
+const logoutWeb = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Se asume que el usuario autenticado se encuentra en res.locals.user (configurado por un middleware)
+    const userId = (res.locals.user as UserI).id;
+    await updateUserTokens(userId!, { webToken: undefined, refreshWebToken: undefined });
+    res.status(httpStatus.ok).send({ message: 'Web session closed successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ──────────────────────────────
+// Cerrar sesión para Móvil
+// ──────────────────────────────
+const logoutMobile = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const userId = (res.locals.user as UserI).id;
+    await updateUserTokens(userId!, { mobileToken: undefined });
+    res.status(httpStatus.ok).send({ message: 'Mobile session closed successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// ──────────────────────────────
+// Regenerar token Web usando refresh token
+// ──────────────────────────────
+const regenerateWebToken = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { refreshToken } = req.body as { refreshToken: string };
+    if (!refreshToken) {
+      return res.status(httpStatus.badRequest).send({ error: 'Refresh token is required' });
+    }
+
+    jwt.verify(refreshToken, process.env.JWT_SECRET_KEY ?? 'secret', async (err, decoded: any) => {
+          if (err) {
+            return res.status(httpStatus.unauthorized).send({ error: 'Invalid refresh token' });
+          }
+    
+          const decodedToken = decoded as { correo: string };
+          const user = await findUserByEmail(decodedToken.correo);
+          if (!user) {
+            return res.status(httpStatus.notFound).send({ error: 'User not found' });
+          }
+    
+          // Generar nuevo webToken y actualizarlo en la BD
+          const newWebToken = generateToken(user, webTokenExpiration);
+          await updateUserTokens(user.id!, { webToken: newWebToken });
+    
+          res.status(httpStatus.ok).send({ tokens: { webToken: newWebToken } });
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export {
+  registerWeb,
+  registerMobile,
+  loginWeb,
+  loginMobile,
+  logoutWeb,
+  logoutMobile,
+  regenerateWebToken
+};

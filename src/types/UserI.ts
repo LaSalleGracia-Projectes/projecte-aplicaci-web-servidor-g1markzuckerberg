@@ -6,6 +6,9 @@ interface UserI {
   is_admin?: boolean;
   created_at?: string;
   google_id?: string | undefined;
+  webToken?: string;
+  mobileToken?: string;
+  refreshWebToken?: string;
 }
 
 export default UserI;
