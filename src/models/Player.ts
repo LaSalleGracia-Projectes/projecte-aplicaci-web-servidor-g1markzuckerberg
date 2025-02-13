@@ -14,26 +14,11 @@ const playerSchema = new mongoose.Schema({
         type: Number,
         required: true
     },
-    detailedPositionId: {
-        type: Number
-    },
-    commonName: {
-        type: String
-    },
-    firstname: {
-        type: String
-    },
-    lastname: {
-        type: String
-    },
     displayName: {
         type: String
     },
     imagePath: {
         type: String
-    },
-    jerseyNumber: {
-        type: Number
     },
     points: [
         {

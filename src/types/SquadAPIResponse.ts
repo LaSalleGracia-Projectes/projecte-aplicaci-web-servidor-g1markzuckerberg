@@ -1,4 +1,4 @@
-interface SquadAPIResponse {
+interface SquadApiResponse {
     player_id: number;
 }
-export default SquadAPIResponse;
+export default SquadApiResponse;

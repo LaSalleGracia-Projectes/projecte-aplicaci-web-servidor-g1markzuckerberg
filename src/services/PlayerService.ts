@@ -1,7 +1,7 @@
 import axios from "axios";
 import dotenv from "dotenv";
-import type PlayerAPIResponse from "../types/PlayerAPIResponse";
-import type SquadAPIResponse from "../types/SquadAPIResponse";
+import type PlayerApiResponse from "../types/PlayerAPIResponse";
+import type SquadApiResponse from "../types/SquadAPIResponse";
 dotenv.config();
 
 const apiToken = process.env.API_TOKEN ?? "xbvRaCMwigNeDpzFc4zsJMhvKc4wHEJm41HljDvUCMl0GjWoCGvzgAydN15R";
@@ -33,7 +33,7 @@ const teamIds = [
 async function getPlayersFromTeam(teamId: number) {
     try {
         // 1. Obtener la lista de jugadores (plantilla) del equipo
-        const squadResponse = await axios.get<{ data: SquadAPIResponse[] }>(
+        const squadResponse = await axios.get<{ data: SquadApiResponse[] }>(
             `https://api.sportmonks.com/v3/football/squads/teams/${teamId}?api_token=${apiToken}`
         );
 
@@ -41,7 +41,7 @@ async function getPlayersFromTeam(teamId: number) {
 
         // 2. Obtener información detallada de cada jugador
         const playerDetailsPromises = players.map(async (player) => {
-            const playerResponse = await axios.get<{ data: PlayerAPIResponse }>(
+            const playerResponse = await axios.get<{ data: PlayerApiResponse }>(
                 `https://api.sportmonks.com/v3/football/players/${player.player_id}?api_token=${apiToken}`
             );
 
@@ -50,11 +50,11 @@ async function getPlayersFromTeam(teamId: number) {
             // Convertimos (opcionalmente) a camelCase
             return {
                 _id: playerData.id,
-                teamId: teamId,
+                teamId,
                 positionId: playerData.position_id,
                 displayName: playerData.display_name,
                 imagePath: playerData.image_path,
-                points: []  // Inicializamos vacío
+                points: []
             };
         });
 
@@ -71,13 +71,16 @@ export async function getAllPlayersFromTeams() {
     const allPlayers: any[] = [];
 
     for (const teamId of teamIds) {
+        // eslint-disable-next-line no-await-in-loop
         const playersOfTeam = await getPlayersFromTeam(teamId);
         allPlayers.push(...playersOfTeam);
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return allPlayers;
 }
 
+/*
 // Ejecución de ejemplo
 getAllPlayersFromTeams()
     .then((players) => {
@@ -87,3 +90,4 @@ getAllPlayersFromTeams()
     .catch((err) => {
         console.error("Error general:", err);
     });
+    */

@@ -1,21 +1,32 @@
 import mongoose, { type ConnectOptions } from 'mongoose';
+import postgres from 'postgres';
 
-const createConnection = async () => {
+const createMongoConnection = async () => {
   try {
-
-    const options: ConnectOptions = { };
-
+    const options: ConnectOptions = {};
     const dbUrl = process.env.DB_URL ?? '';
 
     await mongoose.connect(dbUrl, options);
-    console.log('INFO Connected to the DB');
+    console.log('✅ Connected to MongoDB');
 
     mongoose.connection.on('error', (error) => {
-      console.log('ERROR The connection was interrupted: ', error);
-    })
+      console.log('❌ ERROR MongoDB connection interrupted:', error);
+    });
   } catch (error) {
-    console.log('ERROR Cannot connect to the DB: ', error);
+    console.log('❌ ERROR Cannot connect to MongoDB:', error);
   }
-}
+};
 
-export default createConnection;
+const createPostgresConnection = async () => {
+  try {
+    const connectionString = process.env.DATABASE_URL ?? '';
+    const sql = postgres(connectionString);
+    console.log('✅ Connected to PostgreSQL (Supabase)');
+    return sql; // Retorna la conexión SQL para usarla en otras partes del código
+  } catch (error) {
+    console.log('❌ ERROR Cannot connect to PostgreSQL:', error);
+    throw new Error('❌ ERROR Cannot connect to PostgreSQL: ' + String(error.message));
+  }
+};
+
+export { createMongoConnection, createPostgresConnection };
