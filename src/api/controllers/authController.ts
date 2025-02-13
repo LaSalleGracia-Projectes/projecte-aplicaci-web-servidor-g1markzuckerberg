@@ -156,32 +156,38 @@ const logoutMobile = async (req: Request, res: Response, next: NextFunction) => 
 // ──────────────────────────────
 const regenerateWebToken = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { refreshToken } = req.body as { refreshToken: string };
-    if (!refreshToken) {
-      return res.status(httpStatus.badRequest).send({ error: 'Refresh token is required' });
+    // Obtener el token desde el header Authorization
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(httpStatus.badRequest).send({ error: 'Refresh token is required in Authorization header' });
     }
 
+    const refreshToken = authHeader.split(' ')[1]; // Extraer solo el token
+
     jwt.verify(refreshToken, process.env.JWT_SECRET_KEY ?? 'secret', async (err, decoded: any) => {
-          if (err) {
-            return res.status(httpStatus.unauthorized).send({ error: 'Invalid refresh token' });
-          }
-    
-          const decodedToken = decoded as { correo: string };
-          const user = await findUserByEmail(decodedToken.correo);
-          if (!user) {
-            return res.status(httpStatus.notFound).send({ error: 'User not found' });
-          }
-    
-          // Generar nuevo webToken y actualizarlo en la BD
-          const newWebToken = generateToken(user, webTokenExpiration);
-          await updateUserTokens(user.id!, { webToken: newWebToken });
-    
-          res.status(httpStatus.ok).send({ tokens: { webToken: newWebToken } });
+      if (err) {
+        return res.status(httpStatus.unauthorized).send({ error: 'Invalid refresh token' });
+      }
+
+      const decodedToken = decoded as { correo: string };
+      const user = await findUserByEmail(decodedToken.correo);
+
+      if (!user) {
+        return res.status(httpStatus.notFound).send({ error: 'User not found' });
+      }
+
+      // Generar nuevo webToken y actualizarlo en la BD
+      const newWebToken = generateToken(user, webTokenExpiration);
+      await updateUserTokens(user.id!, { webToken: newWebToken });
+
+      res.status(httpStatus.ok).send({ tokens: { webToken: newWebToken } });
     });
   } catch (error) {
     next(error);
   }
 };
+
 
 export {
   registerWeb,

@@ -14,7 +14,7 @@ authRouter.post('/loginMobile', loginMobile);
 authRouter.post('/regenerate', regenerateWebToken);
 authRouter.post('/logout', authMiddleware, logoutWeb);
 
-authRouter.put('/signupMobile', registerMobile);
+authRouter.post('/signupMobile', registerMobile);
 
 
 export default authRouter;
