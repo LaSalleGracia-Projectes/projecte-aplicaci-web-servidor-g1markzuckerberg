@@ -8,7 +8,7 @@ const sql = postgres(process.env.DATABASE_URL ?? '', { prepare: false });
 const findUserByEmail = async (correo: string): Promise<UserI | undefined> => {
   try {
     const [user] = await sql<UserI[]>`
-      SELECT id, username, correo, is_admin, created_at
+      SELECT id, username, correo, password, is_admin, created_at
       FROM ${sql(userTable)}
       WHERE correo = ${correo}
       LIMIT 1
@@ -24,7 +24,7 @@ const findUserByEmail = async (correo: string): Promise<UserI | undefined> => {
 const findUserById = async (id: string): Promise<UserI | undefined> => {
   try {
     const [user] = await sql<UserI[]>`
-      SELECT id, username, correo, is_admin, created_at
+      SELECT id, username, correo, password, is_admin, created_at
       FROM ${sql(userTable)}
       WHERE id = ${id}
       LIMIT 1
@@ -51,4 +51,40 @@ const createUser = async (user: UserI): Promise<UserI | undefined> => {
   }
 };
 
-export { findUserByEmail, findUserById, createUser};
+const updateUserTokens = async (id: number, tokens: Partial<UserI>): Promise<boolean> => {
+  try {
+    console.log('Updating tokens for user:', id, tokens);
+    const result = await sql`
+      UPDATE ${sql(userTable)}
+      SET 
+        "webToken" = ${tokens.webToken ?? null},
+        "mobileToken" = ${tokens.mobileToken ?? null},
+        "refreshWebToken" = ${tokens.refreshWebToken ?? null}
+      WHERE id = ${id}
+      RETURNING id;
+    `;
+
+    console.log('Update result:', result);
+    return result.length > 0;  // Devuelve true si se actualizó al menos una fila
+  } catch (error) {
+    console.error(`❌ Error updating user tokens:`, error);
+    throw new Error('Database update failed');
+  }
+};
+
+const deleteUserByEmail = async (correo: string): Promise<boolean> => {
+  try {
+    const result = await sql`
+      DELETE FROM ${sql(userTable)}
+      WHERE correo = ${correo}
+      RETURNING id;
+    `;
+
+    return result.length > 0;  // Retorna `true` si se eliminó una fila
+  } catch (error) {
+    console.error(`❌ Error deleting user from database:`, error);
+    return false;
+  }
+};
+
+export { findUserByEmail, findUserById, createUser, updateUserTokens, deleteUserByEmail };
