@@ -1,10 +1,10 @@
 import axios from "axios";
-import dotenv from "dotenv";
 import type PlayerApiResponse from "../types/PlayerAPIResponse";
 import type SquadApiResponse from "../types/SquadAPIResponse";
+import dotenv from "dotenv";
 dotenv.config();
 
-const apiToken = process.env.API_TOKEN ?? "xbvRaCMwigNeDpzFc4zsJMhvKc4wHEJm41HljDvUCMl0GjWoCGvzgAydN15R";
+const apiToken = process.env.API_TOKEN;
 
 // 👇 Array con IDs de equipos
 const teamIds = [
@@ -67,7 +67,7 @@ async function getPlayersFromTeam(teamId: number) {
     }
 }
 
-export async function getAllPlayersFromTeams() {
+async function getAllPlayersFromTeams() {
     const allPlayers: any[] = [];
 
     for (const teamId of teamIds) {
@@ -80,14 +80,4 @@ export async function getAllPlayersFromTeams() {
     return allPlayers;
 }
 
-/*
-// Ejecución de ejemplo
-getAllPlayersFromTeams()
-    .then((players) => {
-        console.log("TOTAL de jugadores en la liga:", players.length);
-        console.log(players);
-    })
-    .catch((err) => {
-        console.error("Error general:", err);
-    });
-    */
+export { getAllPlayersFromTeams };
