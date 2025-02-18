@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { type AxiosResponse } from "axios";
 import type PlayerApiResponse from "../types/PlayerAPIResponse";
 import type SquadApiResponse from "../types/SquadAPIResponse";
 import dotenv from "dotenv";
@@ -33,7 +33,7 @@ const teamIds = [
 async function getPlayersFromTeam(teamId: number) {
     try {
         // 1. Obtener la lista de jugadores (plantilla) del equipo
-        const squadResponse = await axios.get<{ data: SquadApiResponse[] }>(
+        const squadResponse: AxiosResponse<{ data: SquadApiResponse[] }> = await axios.get<{ data: SquadApiResponse[] }>(
             `https://api.sportmonks.com/v3/football/squads/teams/${teamId}?api_token=${apiToken}`
         );
 

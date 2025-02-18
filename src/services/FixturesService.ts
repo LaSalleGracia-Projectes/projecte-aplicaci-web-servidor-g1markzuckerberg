@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/naming-convention */
-import axios from "axios";
+import axios, { type AxiosResponse } from "axios";
 import { roundMapping } from "../constants/roundMapping.js";
 import type Fixture from "../types/Fixture.js";
 import type { RoundsApiResponse } from "../types/RoundsApiResponse.js";
@@ -19,7 +19,7 @@ async function getFixturesByRoundNumber(roundNumber: string): Promise<Fixture[]>
     const url = `https://api.sportmonks.com/v3/football/rounds/${roundId}?api_token=${apiToken}&include=fixtures`;
 
     // Hacer la petición con Axios, tipando la respuesta
-    const response = await axios.get<RoundsApiResponse>(url);
+    const response: AxiosResponse<RoundsApiResponse> = await axios.get<RoundsApiResponse>(url);
 
     // Extraer la propiedad fixtures (asegúrate de que tu interfaz RoundData la tenga)
     const { fixtures } = response.data.data;
