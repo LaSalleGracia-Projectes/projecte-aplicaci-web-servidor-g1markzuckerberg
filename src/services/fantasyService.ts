@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/naming-convention, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-argument, @typescript-eslint/return-await, no-unused-vars, guard-for-in */
+/* eslint-disable @typescript-eslint/naming-convention, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return */
 
 import axios from 'axios';
 import dotenv from 'dotenv';
@@ -6,7 +6,6 @@ import fs from 'fs';
 import type Fixture from '../types/Fixture';
 import type PlayerApiResponse from '../types/PlayerAPIResponse';
 import type { RoundData } from '../types/RoundData';
-import type { RoundsApiResponse } from '../types/RoundsApiResponse';
 dotenv.config();
 
 const apiToken: string = process.env.API_TOKEN ?? '';
@@ -39,7 +38,7 @@ async function getFixtureLineups(fixtureId: number): Promise<LineupPlayer[]> {
     `https://api.sportmonks.com/v3/football/fixtures/${fixtureId}`,
     {
       params: {
-        api_token: apiToken, // eslint-disable-line @typescript-eslint/naming-convention
+        api_token: apiToken,
         include: 'lineups.player;statistics'
       }
     }
@@ -52,7 +51,7 @@ async function getFixtureEvents(fixtureId: number): Promise<Event[]> {
     `https://api.sportmonks.com/v3/football/fixtures/${fixtureId}`,
     {
       params: {
-        api_token: apiToken, // eslint-disable-line @typescript-eslint/naming-convention
+        api_token: apiToken,
         include: 'events'
       }
     }
@@ -83,7 +82,6 @@ function getPointsForEvent(event: Event, positionId = 26): number {
 
 async function processFixtureFantasyPoints(
   fixtureId: number,
-  matchday: number
 ): Promise<{ player_id: number; player_name: string; points: number }[]> {
   try {
     const [lineups, events] = await Promise.all([
@@ -138,7 +136,7 @@ async function processFixtureFantasyPoints(
     }
 
     // Se aplica bono de clean sheet SOLO a los jugadores que hayan jugado (starter true)
-    for (const [id, player] of Object.entries(playerMap)) {
+    for (const [id,player] of Object.entries(playerMap)) {
       if (
         player.starter &&
         ((player.team_id === home_team_id && away_score === 0) ||
@@ -176,7 +174,7 @@ async function processMatchdayFantasyPoints(
 ): Promise<{ player_id: number; player_name: string; points: number }[]> {
   try {
     const fixturesResults = await Promise.all(
-      fixtureIds.map(async (fixtureId) => processFixtureFantasyPoints(fixtureId, 0))
+      fixtureIds.map(async (fixtureId) => processFixtureFantasyPoints(fixtureId))
     );
     const aggregatedMap: Record<number, { player_name: string; points: number }> = {};
     fixturesResults.forEach((fixtureResults) => {
@@ -209,7 +207,7 @@ async function getFixturesForRound(
     `https://api.sportmonks.com/v3/football/rounds/${roundId}`,
     {
       params: {
-        api_token: apiToken, // eslint-disable-line @typescript-eslint/naming-convention
+        api_token: apiToken,
         include: 'fixtures'
       }
     }
