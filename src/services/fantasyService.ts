@@ -3,15 +3,14 @@
 import axios from 'axios';
 import dotenv from 'dotenv';
 import fs from 'fs';
-dotenv.config();
-
-const apiToken: string = process.env.API_TOKEN ?? '';
-
-// Importamos tus interfaces
 import type Fixture from '../types/Fixture';
 import type PlayerApiResponse from '../types/PlayerAPIResponse';
 import type { RoundData } from '../types/RoundData';
 import type { RoundsApiResponse } from '../types/RoundsApiResponse';
+dotenv.config();
+
+const apiToken: string = process.env.API_TOKEN ?? '';
+
 // La interfaz SquadApiResponse no la usamos directamente en este código.
 
 // Creamos una interfaz extendida para los jugadores del lineup, ya que necesitamos 'type_id'
@@ -185,7 +184,7 @@ async function processMatchdayFantasyPoints(
         if (!aggregatedMap[player.player_id]) {
           aggregatedMap[player.player_id] = { player_name: player.player_name, points: 0 };
         }
-        
+
         aggregatedMap[player.player_id].points += player.points;
       });
     });
