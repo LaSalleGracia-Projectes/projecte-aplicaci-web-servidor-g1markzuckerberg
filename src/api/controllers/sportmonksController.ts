@@ -1,6 +1,6 @@
 import { type Request, type Response } from 'express';
-import { getAllPlayersFromTeams } from '../../services/PlayerService.js';
-import { getFixturesByRoundNumber, getCurrentRounds } from '../../services/FixturesService.js';
+import { getAllPlayersFromTeams } from '../../services/playerService.js';
+import { getFixturesByRoundNumber, getCurrentRounds } from '../../services/fixturesService.js';
 import { processRoundFantasyPoints } from '../../services/fantasyService.js';
 
 // Obtener todos los jugadores
@@ -35,8 +35,8 @@ export const getFixturesByRound = (req: Request, res: Response) => {
 export const getCurrentFixtureRounds = (req: Request, res: Response) => {
     getCurrentRounds()
         .then((rounds) => {
-            if (rounds && rounds.length > 0) {
-                res.status(200).json({ jornadaActual: rounds });
+            if (rounds.length > 0) {
+                res.status(200).json({ jornadaActual: rounds[0] });
             } else {
                 res.status(404).json({ message: 'No se encontraron jornadas actuales.' });
             }
