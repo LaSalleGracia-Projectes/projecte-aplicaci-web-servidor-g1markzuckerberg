@@ -54,7 +54,6 @@ async function getPlayersFromTeam(teamId: number) {
                 positionId: playerData.position_id,
                 displayName: playerData.display_name,
                 imagePath: playerData.image_path,
-                points: []
             };
         });
 
