@@ -87,4 +87,4 @@ const deleteUserByEmail = async (correo: string): Promise<boolean> => {
   }
 };
 
-export { findUserByEmail, findUserById, createUser, updateUserTokens, deleteUserByEmail };
+export { findUserByEmail, findUserById, createUser, updateUserTokens, deleteUserByEmail, sql };

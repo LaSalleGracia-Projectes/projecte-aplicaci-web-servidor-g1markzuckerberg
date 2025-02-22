@@ -1,0 +1,1 @@
+export const jornadaTable = 'jornadas'; // Nombre de la tabla en Supabase
