@@ -1,5 +1,5 @@
 import { type Request, type Response, type NextFunction } from 'express';
-import { findUserByEmail, createUser, updateUserTokens } from '../../services/supabaseService.js';
+import { findUserByEmail, createUserService, updateUserTokens } from '../../services/userService.js';
 import type UserI from '../../types/UserI.js';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
@@ -31,7 +31,7 @@ const registerWeb = async (req: Request, res: Response, next: NextFunction) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const user: UserI = { username, correo, password: hashedPassword };
-    const userCreated = await createUser(user);
+    const userCreated = await createUserService(user);
     if (!userCreated) {
       return res.status(httpStatus.internalServerError).send({ error: 'User could not be created' });
     }
@@ -63,7 +63,7 @@ const registerMobile = async (req: Request, res: Response, next: NextFunction) =
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const user: UserI = { username, correo, password: hashedPassword };
-    const userCreated = await createUser(user);
+    const userCreated = await createUserService(user);
     if (!userCreated) {
       return res.status(httpStatus.internalServerError).send({ error: 'User could not be created' });
     }

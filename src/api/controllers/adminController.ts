@@ -1,5 +1,5 @@
 import { type Request, type Response, type NextFunction } from 'express';
-import { findUserByEmail, deleteUserByEmail } from '../../services/supabaseService.js';
+import { findUserByEmail, deleteUserByEmail } from '../../services/userService.js';
 import httpStatus from '../config/httpStatusCodes.js';
 
 const getUserByMail = async (req: Request, res: Response, next: NextFunction) => {

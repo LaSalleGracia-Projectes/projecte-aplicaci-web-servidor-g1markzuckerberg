@@ -1,0 +1,1 @@
+export const ligaTable = 'ligas'; // Nombre de la tabla en Supabase

@@ -4,6 +4,7 @@ import express, { type Express } from 'express';
 import { createMongoConnection, createPostgresConnection } from './config/db.js';
 import apiRouter from './api/index.js';
 import 'dotenv/config.js';
+import { startJornadaCronJob } from './api/controllers/jornadaCronCrontoller.js';
 
 // Inicializar Express
 const app: Express = express();
@@ -34,6 +35,7 @@ const startServer = async () => {
     // Iniciar servidor
     app.listen(port, () => {
       console.log(`⚡️[server]: Server is running at http://localhost:${port}`);
+      // A startJornadaCronJob();
     });
 
     // Exportar la conexión de Supabase
