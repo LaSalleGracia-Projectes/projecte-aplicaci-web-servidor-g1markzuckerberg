@@ -1,7 +1,7 @@
-import { type NextFunction, type Request, type Response } from 'express';
+import { type Request, type Response } from 'express';
 import httpStatus from '../config/httpStatusCodes.js';
 
-const errorMiddleware = (err: Error, req: Request, res: Response, next: NextFunction) => {
+const errorMiddleware = (err: Error, req: Request, res: Response) => {
   console.error(err); // Loggear el error para depuración
   if (err instanceof Error) {
     res.status(httpStatus.internalServerError).send({

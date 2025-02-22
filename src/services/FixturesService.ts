@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/naming-convention */
 import axios, { type AxiosResponse } from "axios";
 import { roundMapping } from "../constants/roundMapping.js";
