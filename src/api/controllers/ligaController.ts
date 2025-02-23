@@ -1,31 +1,34 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { type Request, type Response, type NextFunction } from 'express';
-import { createLigaService, findLigaByCodeService } from '../../services/ligaSupaService.js';
-import { getCurrentJornada } from '../../services/jornadaSupaService.js';
+import { createLigaService, findLigaByCodeService, addUserToLigaService, getUsersByLigaService } from '../../services/ligaSupaService.js';
+import { getCurrentJornada, getJornadaByName } from '../../services/jornadaSupaService.js';
 import type Liga from '../../types/Liga.js';
 import httpStatus from '../config/httpStatusCodes.js';
 
 /**
- * Crear una nueva liga.
- * Se obtiene la jornada actual, se usa el correo del usuario autenticado y se
- * asigna el número de jornada actual (del campo "name") a created_jornada.
+ * 🔹 **Crear una nueva liga.**
+ * - Se obtiene la jornada actual.
+ * - Se usa el correo del usuario autenticado como `created_by`.
+ * - Se guarda el número de jornada en `created_jornada`.
+ * - **El usuario que crea la liga se une automáticamente como capitán.**
  */
 const createLiga = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { name } = req.body as { name: string };
 
-    // Verificar que el usuario esté autenticado
-    const user = res.locals.user as { correo: string } | undefined;
-    if (!user?.correo) {
+    // ✅ Verificar autenticación del usuario
+    const user = res.locals.user as { id: number; correo: string };
+    if (!user?.correo || !user?.id) {
       return res.status(httpStatus.unauthorized).send({ error: 'No autorizado' });
     }
 
-    // Obtener la jornada actual
+    // ✅ Obtener la jornada actual
     const currentJornada = await getCurrentJornada();
     if (!currentJornada) {
       return res.status(httpStatus.internalServerError).send({ error: 'No se pudo obtener la jornada actual' });
     }
 
+    // ✅ Crear la liga
     const newLiga: Liga = {
       id: 0, // Se genera automáticamente en la BD
       name,
@@ -40,28 +43,115 @@ const createLiga = async (req: Request, res: Response, next: NextFunction) => {
       return res.status(httpStatus.internalServerError).send({ error: 'No se pudo crear la liga' });
     }
 
-    res.status(httpStatus.created).send({ liga: ligaCreated });
+    // ✅ El usuario que crea la liga se une automáticamente como capitán
+    const success = await addUserToLigaService(user.id, ligaCreated.id, true);
+    if (!success) {
+      return res.status(httpStatus.internalServerError).send({ error: 'Error al unirse a la liga' });
+    }
+
+    res.status(httpStatus.created).send({ message: 'Liga creada y usuario añadido como capitán', liga: ligaCreated });
   } catch (error) {
     next(error);
   }
 };
 
 /**
- * Unirse a una liga por código (requiere autenticación)
+ * 🔹 Unirse a una liga por código (requiere autenticación)
+ * - Busca la liga por `code`.
+ * - Agrega al usuario autenticado en la tabla `usuarios_ligas`.
  */
 const joinLiga = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { ligaCode } = req.params;
-    const liga = await findLigaByCodeService(ligaCode);
+    
+    // Verificar autenticación del usuario
+    const user = res.locals.user as { id: number; correo: string };
+    if (!user?.id) {
+      return res.status(httpStatus.unauthorized).send({ error: 'No autorizado' });
+    }
 
+    // Buscar la liga
+    const liga = await findLigaByCodeService(ligaCode);
     if (!liga) {
       return res.status(httpStatus.notFound).send({ error: 'Liga no encontrada' });
     }
 
-    res.status(httpStatus.ok).send({ message: 'Liga encontrada', liga });
+    // Agregar el usuario a la liga (No es capitán)
+    const success = await addUserToLigaService(user.id, liga.id, false);
+    if (!success) {
+      return res.status(httpStatus.internalServerError).send({ error: 'No se pudo unir a la liga' });
+    }
+
+    res.status(httpStatus.ok).send({ message: 'Te has unido a la liga con éxito', liga });
   } catch (error) {
     next(error);
   }
 };
 
-export { createLiga, joinLiga };
+/**
+ * 🔹 **Obtener usuarios de una liga por código y jornada opcional.**
+ * - Busca la liga por `code`.
+ * - Si no se proporciona `jornada`, usa la **jornada actual (`is_current = true`)**.
+ * - **Si la jornada solicitada es menor que `created_jornada`, devuelve error.**
+ * - **Si la jornada solicitada es mayor que la jornada actual, devuelve error.**
+ * - Ordena los usuarios por:
+ *   1. `puntos_totales` (descendente)
+ *   2. `username` (alfabético en caso de empate)
+ */
+const getUsersByLiga = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { ligaCode } = req.params;
+    const { jornada } = req.query as { jornada?: string };
+
+    // 🔹 Buscar la liga por código
+    const liga = await findLigaByCodeService(ligaCode);
+    if (!liga) {
+      return res.status(httpStatus.notFound).send({ error: 'Liga no encontrada' });
+    }
+
+    let jornadaData;
+
+    // 🔹 Si se proporciona jornada, obtener por nombre
+    if (jornada) {
+      jornadaData = await getJornadaByName(jornada);
+      if (!jornadaData) {
+        return res.status(httpStatus.notFound).send({ error: `La jornada ${jornada} no existe` });
+      }
+    } else {
+      // 🔹 Si no se proporciona, usar la jornada actual
+      jornadaData = await getCurrentJornada();
+      if (!jornadaData) {
+        return res.status(httpStatus.internalServerError).send({ error: 'No se pudo obtener la jornada actual' });
+      }
+    }
+
+    const jornadaNumber = Number(jornadaData.name);
+    const currentJornada = await getCurrentJornada();
+    const currentJornadaNumber = currentJornada ? Number(currentJornada.name) : 0;
+
+    // 🔹 Validar si la jornada es válida para la liga
+    if (jornadaNumber < liga.created_jornada) {
+      return res.status(httpStatus.badRequest).send({
+        error: `No se puede ver la jornada ${jornadaNumber} porque la liga fue creada en la jornada ${liga.created_jornada}.`
+      });
+    }
+
+    if (jornadaNumber > currentJornadaNumber) {
+      return res.status(httpStatus.badRequest).send({
+        error: `No se puede ver la jornada ${jornadaNumber} porque aún no ha comenzado.`
+      });
+    }
+
+    // 🔹 Obtener usuarios de la liga en esa jornada
+    const data = await getUsersByLigaService(ligaCode, jornadaData.id);
+
+    res.status(httpStatus.ok).send(data);
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+
+export { createLiga, joinLiga, getUsersByLiga };
+
