@@ -31,3 +31,13 @@ export const createJornadaService = async (jornada: Round): Promise<Round | unde
   `;
   return newJornada ?? null;
 };
+
+/**
+ * 🔹 **Obtiene una jornada por su `name` (que representa el número de jornada).**
+ */
+export const getJornadaByName = async (name: string): Promise<Round | undefined> => {
+  const [jornada] = await sql<Round[]>`
+    SELECT * FROM ${sql(jornadaTable)} WHERE name = ${name} LIMIT 1;
+  `;
+  return jornada ?? null;
+};

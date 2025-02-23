@@ -1,0 +1,1 @@
+export const usuariosLigasTable = 'usuarios_ligas'; // Nombre de la tabla en Supabase
