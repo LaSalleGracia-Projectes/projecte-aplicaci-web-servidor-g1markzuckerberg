@@ -1,6 +1,6 @@
 import { type Request, type Response } from 'express';
 import { getAllPlayersFromTeams } from '../../services/playerService.js';
-import { getFixturesByRoundNumber, getCurrentRounds, getCurrentSeasonId } from '../../services/fixturesService.js';
+import { getFixturesByRoundNumber, getCurrentRounds, getCurrentSeasonId, getRoundsBySeasonId } from '../../services/fixturesService.js';
 import { processRoundFantasyPoints } from '../../services/fantasyService.js';
 
 /**
@@ -118,5 +118,35 @@ export const getSeasonId = async (req: Request, res: Response) => {
     } catch (error) {
         console.error("Error al obtener la temporada actual:", error);
         res.status(500).json({ error: "Error interno del servidor" });
+    }
+};
+
+/**
+ * Controlador para obtener todas las jornadas (rounds) de una temporada en base al `season_id`.
+ *
+ * @param {Request} req - Objeto de solicitud HTTP con el `season_id` en los parámetros.
+ * @param {Response} res - Objeto de respuesta HTTP.
+ * @returns {Promise<void>} Responde con un JSON que contiene todas las jornadas o un mensaje de error.
+ */
+export const getRoundsBySeason = async (req: Request, res: Response) => {
+    try {
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        const { season_id } = req.params;
+        const seasonIdNumber = Number(season_id);
+
+        if (isNaN(seasonIdNumber)) {
+            return res.status(400).json({ error: 'El season_id debe ser un número válido.' });
+        }
+
+        const rounds = await getRoundsBySeasonId(seasonIdNumber);
+
+        if (rounds.length > 0) {
+            res.status(200).json({ rounds });
+        } else {
+            res.status(404).json({ message: 'No se encontraron jornadas para esta temporada.' });
+        }
+    } catch (error) {
+        console.error('Error al obtener las jornadas de la temporada:', error);
+        res.status(500).json({ error: 'Error interno del servidor' });
     }
 };

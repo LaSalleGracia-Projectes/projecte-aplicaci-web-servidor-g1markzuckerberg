@@ -35,7 +35,7 @@ const startServer = async () => {
     // Iniciar servidor
     app.listen(port, () => {
       console.log(`⚡️[server]: Server is running at http://localhost:${port}`);
-      // A startJornadaCronJob();
+      startJornadaCronJob();
     });
 
     // Exportar la conexión de Supabase
