@@ -9,6 +9,13 @@ dotenv.config();
 import type  Round from "../types/Round.js";
 const apiToken = process.env.API_TOKEN;
 
+/**
+ * Obtiene los fixtures (partidos) de una jornada específica de la Liga.
+ *
+ * @param {string} roundNumber - Número de la jornada a consultar.
+ * @returns {Promise<Fixture[]>} Lista de fixtures de la jornada solicitada.
+ * @throws {Error} Si el número de jornada no existe en el mapeo.
+ */
 async function getFixturesByRoundNumber(roundNumber: string): Promise<Fixture[]> {
     // Buscar el ID de la jornada a partir del número
     const roundId = roundMapping[roundNumber];
@@ -34,6 +41,11 @@ async function getFixturesByRoundNumber(roundNumber: string): Promise<Fixture[]>
     }));
 }
 
+/**
+ * Obtiene la jornada actual en curso dentro de la temporada activa.
+ *
+ * @returns {Promise<Round[]>} Un array con la jornada actual si existe, o un array vacío si no hay jornada activa.
+ */
 async function getCurrentRounds(): Promise<Round[]> {
     const url = `https://api.sportmonks.com/v3/football/rounds/seasons/23621?api_token=${apiToken}`;
     try {
@@ -56,6 +68,24 @@ async function getCurrentRounds(): Promise<Round[]> {
     }
 }
 
+/**
+ * Obtiene el ID de la temporada actual de La Liga desde la API de Sportmonks.
+ *
+ * @returns {Promise<number | undefined>} El ID de la temporada actual si existe, o `undefined` en caso de error.
+ */
+async function getCurrentSeasonId(): Promise<number | undefined> {
+    const url = `https://api.sportmonks.com/v3/football/leagues/564?api_token=${apiToken}&include=currentSeason`;
+
+    try {
+        const response = await axios.get(url);
+        const seasonId: number | undefined = response.data.data?.currentseason?.id;
+
+        return seasonId ?? undefined;
+    } catch (error) {
+        console.error("Error al obtener la temporada actual:", error.response?.data || error.message);
+        return undefined;
+    }
+}
 
 
-export { getFixturesByRoundNumber, getCurrentRounds };
+export { getFixturesByRoundNumber, getCurrentRounds, getCurrentSeasonId };
