@@ -12,10 +12,9 @@ export const getMatchStatsController = async (
     req: Request,
     res: Response
 ): Promise<void> => {
-    const roundId = Number(req.params.roundId);
     const fixtureId = Number(req.params.fixtureId);
 
-    if (isNaN(roundId) || isNaN(fixtureId)) {
+    if (isNaN(fixtureId)) {
         res
             .status(400)
             .json({ error: "roundId y fixtureId deben ser números válidos." });
@@ -23,7 +22,7 @@ export const getMatchStatsController = async (
     }
 
     try {
-        const stats = await getMatchStatistics(roundId, fixtureId);
+        const stats = await getMatchStatistics(fixtureId);
 
         if (stats) {
             res.status(200).json(stats);

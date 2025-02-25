@@ -3,7 +3,6 @@ import type TeamInfo from './TeamInfo';
 interface MatchStatistics {
     fixtureId: number;
     name: string;
-    roundId: number;
     date: string;
     resultInfo: string;
     teams: {
