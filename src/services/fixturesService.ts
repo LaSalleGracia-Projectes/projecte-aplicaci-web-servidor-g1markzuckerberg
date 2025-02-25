@@ -57,7 +57,9 @@ async function getCurrentRounds(): Promise<Round[]> {
                 name: currentRound.name,
                 id: currentRound.id,
                 season_id: currentRound.season_id,
-                is_current: currentRound.is_current
+                is_current: currentRound.is_current,
+                starting_at: currentRound.starting_at,
+                ending_at: currentRound.ending_at
             }];
         }
 
@@ -87,5 +89,30 @@ async function getCurrentSeasonId(): Promise<number | undefined> {
     }
 }
 
+/**
+ * Obtiene todas las jornadas (rounds) de una temporada específica.
+ *
+ * @param {number} seasonId - ID de la temporada.
+ * @returns {Promise<Round[]>} Lista de jornadas de la temporada solicitada.
+ */
+async function getRoundsBySeasonId(seasonId: number): Promise<Round[]> {
+    const url = `https://api.sportmonks.com/v3/football/rounds/seasons/${seasonId}?api_token=${apiToken}`;
 
-export { getFixturesByRoundNumber, getCurrentRounds, getCurrentSeasonId };
+    try {
+        const response = await axios.get<{ data: Round[] }>(url);
+        return response.data.data.map((round: Round) => ({
+            name: round.name,
+            id: round.id,
+            season_id: round.season_id,
+            is_current: round.is_current,
+            starting_at: round.starting_at,
+            ending_at: round.ending_at
+        }));
+    } catch (error) {
+        console.error("❌ Error al obtener las jornadas de la temporada:", error.response?.data || error.message);
+        throw new Error("Error al obtener las jornadas de la temporada.");
+    }
+}
+
+
+export { getFixturesByRoundNumber, getCurrentRounds, getCurrentSeasonId, getRoundsBySeasonId };

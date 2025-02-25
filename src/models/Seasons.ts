@@ -1,0 +1,1 @@
+export const seasonsTable = 'seasons'; // Nombre de la tabla en Supabase
