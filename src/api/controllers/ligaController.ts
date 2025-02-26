@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { type Request, type Response, type NextFunction } from 'express';
-import { createLigaService, findLigaByCodeService, addUserToLigaService, getUsersByLigaService } from '../../services/ligaSupaService.js';
+import { createLigaService, findLigaByCodeService, addUserToLigaService, getUsersByLigaService, isUserInLigaService } from '../../services/ligaSupaService.js';
 import { getCurrentJornada, getJornadaByName } from '../../services/jornadaSupaService.js';
 import type Liga from '../../types/Liga.js';
 import httpStatus from '../config/httpStatusCodes.js';
@@ -103,47 +103,26 @@ const getUsersByLiga = async (req: Request, res: Response, next: NextFunction) =
     const { ligaCode } = req.params;
     const { jornada } = req.query as { jornada?: string };
 
-    // 🔹 Buscar la liga por código
+    // ✅ Verificar autenticación del usuario
+    const user = res.locals.user as { id: number };
+    if (!user?.id) {
+      return res.status(httpStatus.unauthorized).send({ error: 'No autorizado' });
+    }
+
+    // ✅ Buscar la liga por código
     const liga = await findLigaByCodeService(ligaCode);
     if (!liga) {
       return res.status(httpStatus.notFound).send({ error: 'Liga no encontrada' });
     }
 
-    let jornadaData;
-
-    // 🔹 Si se proporciona jornada, obtener por nombre
-    if (jornada) {
-      jornadaData = await getJornadaByName(jornada);
-      if (!jornadaData) {
-        return res.status(httpStatus.notFound).send({ error: `La jornada ${jornada} no existe` });
-      }
-    } else {
-      // 🔹 Si no se proporciona, usar la jornada actual
-      jornadaData = await getCurrentJornada();
-      if (!jornadaData) {
-        return res.status(httpStatus.internalServerError).send({ error: 'No se pudo obtener la jornada actual' });
-      }
+    // ✅ Verificar si el usuario está en la liga
+    const isUserInLiga = await isUserInLigaService(user.id, liga.id);
+    if (!isUserInLiga) {
+      return res.status(httpStatus.unauthorized).send({ error: 'No estás unido a esta liga' });
     }
 
-    const jornadaNumber = Number(jornadaData.name);
-    const currentJornada = await getCurrentJornada();
-    const currentJornadaNumber = currentJornada ? Number(currentJornada.name) : 0;
-
-    // 🔹 Validar si la jornada es válida para la liga
-    if (jornadaNumber < liga.created_jornada) {
-      return res.status(httpStatus.badRequest).send({
-        error: `No se puede ver la jornada ${jornadaNumber} porque la liga fue creada en la jornada ${liga.created_jornada}.`
-      });
-    }
-
-    if (jornadaNumber > currentJornadaNumber) {
-      return res.status(httpStatus.badRequest).send({
-        error: `No se puede ver la jornada ${jornadaNumber} porque aún no ha comenzado.`
-      });
-    }
-
-    // 🔹 Obtener usuarios de la liga en esa jornada
-    const data = await getUsersByLigaService(ligaCode, jornadaData.id);
+    // ✅ Llamar al servicio para obtener usuarios de la liga
+    const data = await getUsersByLigaService(ligaCode, jornada);
 
     res.status(httpStatus.ok).send(data);
   } catch (error) {
@@ -154,4 +133,5 @@ const getUsersByLiga = async (req: Request, res: Response, next: NextFunction) =
 
 
 export { createLiga, joinLiga, getUsersByLiga };
+
 
