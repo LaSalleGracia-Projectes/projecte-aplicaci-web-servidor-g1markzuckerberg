@@ -46,11 +46,11 @@ export const getFixtureEvents = async (fixtureId: number): Promise<Event[]> => {
 export const getPointsForEvent = (event: Event, positionId = 26): number => {
   let pts = 0;
   if (event.type_id === 14) {
-    if (positionId === 24 || positionId === 25) {
+    if (positionId === 24 || positionId === 25) { // Portero y defensas
       pts += 6;
-    } else if (positionId === 26) {
+    } else if (positionId === 26) {  // Centrocampista
       pts += 5;
-    } else if (positionId === 27) {
+    } else if (positionId === 27) { // Delantero
       pts += 4;
     }
   } else if (event.type_id === 15) {
@@ -63,6 +63,8 @@ export const getPointsForEvent = (event: Event, positionId = 26): number => {
 
   return pts;
 };
+// todo: calcular estadisticas de los jugadores en base al rendimiento de su equipo.
+
 
 /**
  * Procesa un fixture y calcula los puntos fantasy para cada jugador.
