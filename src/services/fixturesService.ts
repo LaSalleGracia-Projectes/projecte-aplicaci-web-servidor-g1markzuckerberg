@@ -40,14 +40,23 @@ async function getFixturesByRoundNumber(roundNumber: string): Promise<Fixture[]>
         starting_at_timestamp: fixture.starting_at_timestamp
     }));
 }
-
 /**
  * Obtiene la jornada actual en curso dentro de la temporada activa.
  *
  * @returns {Promise<Round[]>} Un array con la jornada actual si existe, o un array vacío si no hay jornada activa.
  */
+
 async function getCurrentRounds(): Promise<Round[]> {
-    const url = `https://api.sportmonks.com/v3/football/rounds/seasons/23621?api_token=${apiToken}`;
+    // Obtener el ID de la temporada actual
+    const seasonId = await getCurrentSeasonId();
+    if (!seasonId) {
+        console.error("No se pudo obtener el id de la temporada actual");
+        return [];
+    }
+
+    // Construir la URL utilizando el seasonId obtenido
+    const url = `https://api.sportmonks.com/v3/football/rounds/seasons/${seasonId}?api_token=${apiToken}`;
+
     try {
         const response = await axios.get<{ data: Round[] }>(url);
         const currentRound = response.data.data.find((round: Round) => round.is_current);
