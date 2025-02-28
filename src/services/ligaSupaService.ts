@@ -4,6 +4,7 @@ import { ligaTable } from '../models/Liga.js';
 import { usuariosLigasTable } from '../models/LigaUsuario.js';
 import { userTable } from '../models/User.js';
 import { jornadaTable } from '../models/Jornada.js';
+import { getCurrentJornada, getJornadaByName } from './jornadaSupaService.js';
 
 /**
  * Función para generar un código único de liga (8 caracteres en mayúsculas)
@@ -70,50 +71,94 @@ const addUserToLigaService = async (usuario_id: number, liga_id: number, is_capi
   }
 };
 
-const getUsersByLigaService = async (ligaCode: string, jornada_id?: number) => {
+/**
+ * 🔹 Obtener usuarios de una liga por código y jornada opcional usando la función `get_puntos_acumulados6`
+ * - Si no se proporciona jornada, usa la jornada actual.
+ * - Convierte `code` de liga en `id` de liga.
+ * - Convierte `name` de jornada en `id` de jornada.
+ */
+const getUsersByLigaService = async (ligaCode: string, jornadaName?: string) => {
   try {
-    // Buscar la liga por código
-    const [liga] = await sql<Array<{ id: number; jornada_id: number }>>`
-      SELECT id, jornada_id FROM ${sql(ligaTable)}
-      WHERE code = ${ligaCode}
-      LIMIT 1
-    `;
-
+    // 🔹 Buscar la liga por código
+    const liga = await findLigaByCodeService(ligaCode);
     if (!liga) {
       throw new Error('Liga no encontrada');
     }
 
-    // Si no se proporciona jornada_id, buscar la jornada actual
-    let jornadaActualId = jornada_id;
-    if (!jornada_id) {
-      const [currentJornada] = await sql<Array<{ id: number }>>`
-        SELECT id FROM ${sql(jornadaTable)}
-        WHERE is_current = true
-        LIMIT 1
-      `;
-      if (currentJornada) {
-        jornadaActualId = currentJornada.id;
+    // 🔹 Determinar la jornada a consultar
+    let jornada;
+    if (jornadaName) {
+      jornada = await getJornadaByName(jornadaName);
+      if (!jornada) {
+        throw new Error(`La jornada ${jornadaName} no existe`);
+      }
+    } else {
+      jornada = await getCurrentJornada();
+      if (!jornada) {
+        throw new Error('No se pudo obtener la jornada actual');
       }
     }
 
-    // Obtener los usuarios de la liga con sus puntos ordenados
+    const jornadaId = jornada.id;
+    const jornadaNumber = Number(jornada.name);
+    const createdJornadaNumber = liga.created_jornada;
+
+    // ❌ Validar si la jornada es anterior a la de creación de la liga
+    if (jornadaNumber < createdJornadaNumber) {
+      throw new Error(
+        `No se puede consultar la jornada ${jornadaNumber} porque la liga fue creada en la jornada ${createdJornadaNumber}.`
+      );
+    }
+
+    // 🔹 Obtener la jornada actual para evitar consultas a jornadas futuras
+    const currentJornada = await getCurrentJornada();
+    const currentJornadaNumber = currentJornada ? Number(currentJornada.name) : 0;
+
+    // ❌ Validar si la jornada es mayor a la actual
+    if (jornadaNumber > currentJornadaNumber) {
+      throw new Error(
+        `No se puede consultar la jornada ${jornadaNumber} porque aún no ha comenzado.`
+      );
+    }
+
+    // 🔹 Ejecutar la función `get_puntos_acumulados6` en Supabase
     const users = await sql`
-      SELECT 
-        u.id, u.username, ul.puntos_totales, ul.is_capitan
-      FROM ${sql(usuariosLigasTable)} ul
-      JOIN ${sql(userTable)} u ON ul.usuario_id = u.id
-      WHERE ul.liga_id = ${liga.id}
-      ORDER BY ul.puntos_totales DESC, u.username ASC;
+      SELECT u.username, p.*
+      FROM get_puntos_acumulados6(${liga.id}, ${jornadaId}) AS p
+      JOIN ${sql(userTable)} u ON p.usuario_id = u.id
+      ORDER BY p.puntos_acumulados DESC, u.username ASC;
     `;
 
     // eslint-disable-next-line @typescript-eslint/naming-convention
-    return { liga, users, jornada_id: jornadaActualId };
+    return { liga, users, jornada_id: jornadaId };
   } catch (error) {
     console.error(`❌ Error al obtener usuarios de la liga:`, error);
     throw new Error(`Database error while fetching league users`);
   }
 };
 
+/**
+ * 🔹 **Verifica si un usuario está en una liga.**
+ * @param usuarioId - ID del usuario.
+ * @param ligaId - ID de la liga.
+ * @returns {Promise<boolean>} - `true` si el usuario está en la liga, `false` en caso contrario.
+ */
+const isUserInLigaService = async (usuarioId: number, ligaId: number): Promise<boolean> => {
+  try {
+    const [exists] = await sql`
+      SELECT 1 FROM ${sql(usuariosLigasTable)}
+      WHERE usuario_id = ${usuarioId} AND liga_id = ${ligaId}
+      LIMIT 1;
+    `;
+
+    return Boolean(exists);
+  } catch (error) {
+    console.error(`❌ Error al verificar si el usuario está en la liga:`, error);
+    throw new Error(`Database error while checking user in league`);
+  }
+};
 
 
-export { createLigaService, findLigaByCodeService, addUserToLigaService, getUsersByLigaService };
+
+
+export { createLigaService, findLigaByCodeService, addUserToLigaService, getUsersByLigaService, isUserInLigaService };
