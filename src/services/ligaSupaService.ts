@@ -79,13 +79,13 @@ const addUserToLigaService = async (usuario_id: number, liga_id: number, is_capi
  */
 const getUsersByLigaService = async (ligaCode: string, jornadaName?: string) => {
   try {
-    // 🔹 Buscar la liga por código
+    // Buscar la liga por código para obtener su ID y datos
     const liga = await findLigaByCodeService(ligaCode);
     if (!liga) {
       throw new Error('Liga no encontrada');
     }
 
-    // 🔹 Determinar la jornada a consultar
+    // Determinar la jornada a consultar
     let jornada;
     if (jornadaName) {
       jornada = await getJornadaByName(jornadaName);
@@ -103,30 +103,29 @@ const getUsersByLigaService = async (ligaCode: string, jornadaName?: string) => 
     const jornadaNumber = Number(jornada.name);
     const createdJornadaNumber = liga.created_jornada;
 
-    // ❌ Validar si la jornada es anterior a la de creación de la liga
+    // Validar que la jornada consultada no sea anterior a la jornada de creación de la liga
     if (jornadaNumber < createdJornadaNumber) {
       throw new Error(
         `No se puede consultar la jornada ${jornadaNumber} porque la liga fue creada en la jornada ${createdJornadaNumber}.`
       );
     }
 
-    // 🔹 Obtener la jornada actual para evitar consultas a jornadas futuras
+    // Obtener la jornada actual para evitar consultar jornadas futuras
     const currentJornada = await getCurrentJornada();
     const currentJornadaNumber = currentJornada ? Number(currentJornada.name) : 0;
-
-    // ❌ Validar si la jornada es mayor a la actual
     if (jornadaNumber > currentJornadaNumber) {
       throw new Error(
         `No se puede consultar la jornada ${jornadaNumber} porque aún no ha comenzado.`
       );
     }
 
-    // 🔹 Ejecutar la función `get_puntos_acumulados6` en Supabase
+    // Consultar la vista vw_puntos_acumulados para obtener los usuarios con sus puntos
     const users = await sql`
-      SELECT u.username, p.*
-      FROM get_puntos_acumulados6(${liga.id}, ${jornadaId}) AS p
-      JOIN ${sql(userTable)} u ON p.usuario_id = u.id
-      ORDER BY p.puntos_acumulados DESC, u.username ASC;
+      SELECT u.username, v.usuario_id, v.puntos_jornada, v.puntos_acumulados
+      FROM vw_puntos_acumulados v
+      JOIN ${sql(userTable)} u ON v.usuario_id = u.id
+      WHERE v.liga_id = ${liga.id} AND v.jornada_id = ${jornadaId}
+      ORDER BY v.puntos_acumulados DESC, u.username ASC;
     `;
 
     // eslint-disable-next-line @typescript-eslint/naming-convention
