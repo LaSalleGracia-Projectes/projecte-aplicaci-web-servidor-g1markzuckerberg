@@ -18,6 +18,7 @@ Tabla de Contenidos 📚
 -   Estructura del Proyecto 🗂️
 -   Contribuciones 🤝
 -   Licencia 📄
+-   Autores 👥
 
 Descripción del Proyecto 📝
 ------------------------
