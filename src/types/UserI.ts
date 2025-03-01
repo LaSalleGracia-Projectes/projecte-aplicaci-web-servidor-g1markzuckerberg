@@ -9,6 +9,7 @@ interface UserI {
   webToken?: string;
   mobileToken?: string;
   refreshWebToken?: string;
+  birthDate?: Date;
 }
 
 export default UserI;

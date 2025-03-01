@@ -1,6 +1,7 @@
 import { sql } from './supabaseService.js';
 import type UserI from '../types/UserI.js';
 import { userTable } from '../models/User.js';
+import bcrypt from 'bcrypt';
 
 /**
  * 🔹 Buscar usuario por correo
@@ -107,4 +108,171 @@ const updateUserTokens = async (id: number, tokens: Partial<UserI>): Promise<boo
   }
 };
 
-export { getUserService, getUserByIdService, createUserService, findUserByEmail, deleteUserByEmail, updateUserTokens };
+/**
+ * 🔹 **Actualizar el nombre de usuario (username) del usuario autenticado**
+ */
+const updateUsernameService = async (id: number, newUsername: string) => {
+  try {
+    const result = await sql`
+      UPDATE ${sql(userTable)}
+      SET username = ${newUsername}
+      WHERE id = ${id}
+      RETURNING id, username, correo, is_admin, created_at, "birthDate";
+    `;
+    return result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error(`❌ Error updating username:`, error);
+    throw new Error(`Database error while updating username`);
+  }
+};
+
+/**
+ * 🔹 **Actualizar la fecha de nacimiento (birthDate) del usuario autenticado**
+ */
+const updateBirthDateService = async (id: number, newBirthDate: Date | string) => {
+  try {
+    // Convertir a Date si viene como string
+    const dateObj = newBirthDate instanceof Date ? newBirthDate : new Date(newBirthDate);
+    if (isNaN(dateObj.getTime())) {
+      throw new Error("Invalid date format");
+    }
+
+    const formattedDate = dateObj.toISOString().split('T')[0]; // "YYYY-MM-DD"
+    
+    const result = await sql`
+      UPDATE ${sql(userTable)}
+      SET "birthDate" = ${formattedDate}
+      WHERE id = ${id}
+      RETURNING id, username, correo, is_admin, created_at, "birthDate";
+    `;
+
+    return result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error(`❌ Error updating birth date:`, error);
+    throw new Error(`Database error while updating birth date`);
+  }
+};
+
+
+/**
+ * 🔹 **Actualizar la contraseña del usuario autenticado**
+ */
+const updatePasswordService = async (id: number, oldPassword: string, newPassword: string) => {
+  try {
+    const [user] = await sql<UserI[]>`
+      SELECT password FROM ${sql(userTable)}
+      WHERE id = ${id}
+      LIMIT 1;
+    `;
+
+    if (!user?.password || !(await bcrypt.compare(oldPassword, user.password))) {
+      throw new Error(`Invalid current password`);
+    }
+
+    // Opcional: hashear la nueva contraseña antes de actualizarla
+    const hashedNewPassword = await bcrypt.hash(newPassword, 10);
+
+    const result = await sql`
+      UPDATE ${sql(userTable)}
+      SET password = ${hashedNewPassword}
+      WHERE id = ${id}
+      RETURNING id;
+    `;
+
+    return result.length > 0;
+  } catch (error) {
+    console.error(`❌ Error updating password:`, error);
+    throw new Error(`Database error while updating password`);
+  }
+};
+
+/**
+ * 🔹 **Obtener todos los datos de un usuario por ID**
+ */
+const getUserByIdAdminService = async (adminId: number, userId: number) => {
+  try {
+    // Verificar si el usuario solicitante es admin
+    const [admin] = await sql<UserI[]>`
+      SELECT is_admin FROM ${sql(userTable)}
+      WHERE id = ${adminId}
+      LIMIT 1;
+    `;
+    if (!admin || !admin.is_admin) {
+      throw new Error(`Unauthorized: Only admins can perform this action`);
+    }
+
+    // Obtener el usuario por ID, usando comillas dobles para "birthDate"
+    const [user] = await sql<UserI[]>`
+      SELECT id, username, correo, is_admin, created_at, "birthDate"
+      FROM ${sql(userTable)}
+      WHERE id = ${userId}
+      LIMIT 1;
+    `;
+
+    return user ?? null;
+  } catch (error) {
+    console.error(`❌ Error fetching user by ID:`, error);
+    if (error instanceof Error && error.message.startsWith("Unauthorized")) {
+      // Re-lanza el error sin cambiar el mensaje
+      throw error;
+    }
+    
+    throw new Error(`Database error while fetching user`);
+  }
+};
+
+/**
+ * 🔹 **Editar usuario como administrador (incluyendo rol)**
+ */
+const adminUpdateUserService = async (adminId: number, userId: number, updates: Partial<UserI>) => {
+  try {
+    // Verificar si el usuario solicitante es admin
+    const [admin] = await sql<UserI[]>`
+      SELECT is_admin FROM ${sql(userTable)}
+      WHERE id = ${adminId}
+      LIMIT 1;
+    `;
+    if (!admin || !admin.is_admin) {
+      throw new Error(`Unauthorized: Only admins can perform this action`);
+    }
+
+    // Construir el objeto con solo los campos a actualizar
+    const updateData: Record<string, any> = {};
+    if (updates.username) updateData.username = updates.username;
+    if (updates.birthDate) {
+      // Si birthDate no es un objeto Date, lo convertimos
+      let bd: Date;
+      if (updates.birthDate instanceof Date) {
+        bd = updates.birthDate;
+      } else {
+        bd = new Date(updates.birthDate);
+      }
+      // Convertir a "YYYY-MM-DD"
+
+      updateData.birthDate = bd.toISOString().split('T')[0];
+    }
+
+    if (updates.is_admin !== undefined) updateData.is_admin = updates.is_admin;
+    if (updates.password) updateData.password = updates.password;
+
+    if (Object.keys(updateData).length === 0) return null; // No hay cambios
+
+    const [updatedUser] = await sql<UserI[]>`
+      UPDATE ${sql(userTable)}
+      SET ${sql(updateData)}
+      WHERE id = ${userId}
+      RETURNING id, username, correo, is_admin, created_at, "birthDate";
+    `;
+    
+    return updatedUser ?? null;
+  } catch (error) {
+    console.error(`❌ Error updating user as admin:`, error);
+    throw new Error(`Database error while updating user`);
+  }
+};
+
+
+
+export { getUserService, getUserByIdService, createUserService, findUserByEmail,
+  deleteUserByEmail, updateUserTokens, updateBirthDateService, updateUsernameService,
+  updatePasswordService, adminUpdateUserService, getUserByIdAdminService };

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { registerWeb, registerMobile, loginWeb, loginMobile, logoutWeb, logoutMobile, regenerateWebToken} from '../controllers/authController.js';
-import { registerSchema } from '../models/Joi/authSchemas.js';
+import { loginSchema, registerSchema } from '../models/Joi/authSchemas.js';
 import validate from '../middlewares/joiValidation.js';
 import { getUserByMail, deleteAccountByMail } from '../controllers/adminController.js';
 import authMiddleware from '../middlewares/authMiddleware.js';
@@ -12,8 +12,8 @@ authRouter.delete('/user/delete', deleteAccountByMail);
 
 authRouter.post('/signup', validate(registerSchema, 'body'), registerWeb);
 authRouter.post('/signupMobile', registerMobile);
-authRouter.post('/login', loginWeb);
-authRouter.post('/loginMobile', loginMobile);
+authRouter.post('/login', validate(loginSchema, 'body'), loginWeb);
+authRouter.post('/loginMobile', validate(loginSchema, 'body'), loginMobile);
 authRouter.put('/regenerate', regenerateWebToken);
 authRouter.post('/logout', authMiddleware, logoutWeb);
 authRouter.post('/logoutMobile', authMiddleware, logoutMobile);
