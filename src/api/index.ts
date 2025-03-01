@@ -3,6 +3,7 @@ import authRouter from './routers/authRouter.js';
 import sportmonksRouter from './routers/sportmonksRouter.js';
 import userRouter from './routers/userRouter.js';
 import ligaRouter from './routers/ligaRouter.js';
+import adminRouter from './routers/adminRouter.js';
 
 const apiRouter = Router();
 
@@ -14,6 +15,8 @@ apiRouter.use('/auth', authRouter);
 apiRouter.use('/sportmonks', sportmonksRouter);
 
 apiRouter.use('/liga', ligaRouter);
+
+apiRouter.use('/admin', adminRouter);
 
 apiRouter.use('/user', userRouter);
 
