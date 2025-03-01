@@ -5,12 +5,11 @@ import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import httpStatus from '../config/httpStatusCodes.js';
 
-// Configuración de expiración de tokens
-const webTokenExpiration = '1h';      // 1 hora para token web
-const mobileTokenExpiration = '365d';   // Token móvil con validez prolongada
-const refreshWebTokenExpiration = '7d';    // 7 días para refresh token
+// Expiración de tokens
+const webTokenExpiration = '1h';
+const mobileTokenExpiration = '365d';
+const refreshWebTokenExpiration = '7d';
 
-// Función auxiliar para generar tokens
 const generateToken = (user: UserI, expiresIn: string) => 
   jwt.sign(
     { id: user.id, correo: user.correo, isAdmin: user.is_admin },
@@ -18,9 +17,6 @@ const generateToken = (user: UserI, expiresIn: string) =>
     { expiresIn }
   );
 
-// ──────────────────────────────
-// Registro de usuario para Web
-// ──────────────────────────────
 const registerWeb = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { username, correo, password } = req.body as { username: string; correo: string; password: string };
@@ -50,9 +46,6 @@ const registerWeb = async (req: Request, res: Response, next: NextFunction) => {
   }
 };
 
-// ──────────────────────────────
-// Registro de usuario para Móvil
-// ──────────────────────────────
 const registerMobile = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { username, correo, password } = req.body as { username: string; correo: string; password: string };
@@ -81,9 +74,6 @@ const registerMobile = async (req: Request, res: Response, next: NextFunction) =
   }
 };
 
-// ──────────────────────────────
-// Login de usuario para Web
-// ──────────────────────────────
 const loginWeb = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { correo, password } = req.body as { correo: string; password: string };
@@ -103,9 +93,6 @@ const loginWeb = async (req: Request, res: Response, next: NextFunction) => {
   }
 };
 
-// ──────────────────────────────
-// Login de usuario para Móvil
-// ──────────────────────────────
 const loginMobile = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { correo, password } = req.body as { correo: string; password: string };
@@ -124,9 +111,6 @@ const loginMobile = async (req: Request, res: Response, next: NextFunction) => {
   }
 };
 
-// ──────────────────────────────
-// Cerrar sesión para Web
-// ──────────────────────────────
 const logoutWeb = async (req: Request, res: Response, next: NextFunction) => {
   try {
     // Se asume que el usuario autenticado se encuentra en res.locals.user (configurado por un middleware)
@@ -138,9 +122,6 @@ const logoutWeb = async (req: Request, res: Response, next: NextFunction) => {
   }
 };
 
-// ──────────────────────────────
-// Cerrar sesión para Móvil
-// ──────────────────────────────
 const logoutMobile = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const userId = (res.locals.user as UserI).id;
@@ -151,9 +132,6 @@ const logoutMobile = async (req: Request, res: Response, next: NextFunction) => 
   }
 };
 
-// ──────────────────────────────
-// Regenerar token Web usando refresh token
-// ──────────────────────────────
 const regenerateWebToken = async (req: Request, res: Response, next: NextFunction) => {
   try {
     // Obtener el token desde el header Authorization
