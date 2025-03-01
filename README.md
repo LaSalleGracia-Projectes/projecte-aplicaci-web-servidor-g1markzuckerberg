@@ -1,4 +1,3 @@
-```
 * * * * *
 
 Fantasy Draft: El Fantasy Fútbol con Draft Semanal ⚽🏆
