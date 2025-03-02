@@ -94,7 +94,7 @@ function mapEvents(events: ApiEvent[]): EventInfo[] {
  * @param {number} fixtureId - ID del partido.
  * @returns {Promise<MatchStatistics | undefined>} Objeto con las estadísticas del partido o undefined en caso de error.
  */
-export async function getMatchStatistics(fixtureId: number): Promise<MatchStatistics | undefined> {
+async function getMatchStatistics(fixtureId: number): Promise<MatchStatistics | undefined> {
     const data = await fetchFixtureData(fixtureId);
     if (!data) return undefined;
 
@@ -138,3 +138,5 @@ export async function getMatchStatistics(fixtureId: number): Promise<MatchStatis
 
     return matchStats;
 }
+
+export { getMatchStatistics };
