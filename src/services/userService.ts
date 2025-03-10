@@ -3,7 +3,7 @@ import type UserI from '../types/UserI.js';
 import { userTable } from '../models/User.js';
 
 /**
- * 🔹 Buscar usuario por correo
+ * Buscar usuario por correo
  */
 const getUserService = async (credentials: Partial<UserI>) => {
   try {
@@ -21,7 +21,7 @@ const getUserService = async (credentials: Partial<UserI>) => {
 };
 
 /**
- * 🔹 Buscar usuario por ID
+ * Buscar usuario por ID
  */
 const getUserByIdService = async (id: string) => {
   try {
@@ -39,7 +39,7 @@ const getUserByIdService = async (id: string) => {
 };
 
 /**
- * 🔹 Crear un usuario en Supabase
+ * Crear un usuario en Supabase
  */
 const createUserService = async (user: UserI) => {
   try {

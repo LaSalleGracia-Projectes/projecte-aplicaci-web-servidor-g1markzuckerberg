@@ -1,6 +1,6 @@
 import { Router, type RequestHandler } from 'express';
 import { getAllPlayers, getFixturesByRound, getCurrentFixtureRounds, processRoundFantasyPointsController, getSeasonId, getRoundsBySeason } from '../controllers/sportmonksController.js';
-
+import { getTeams } from '../controllers/sportmonksController.js';
 /**
  * @module sportmonksRouter
  * @description Rutas para interactuar con la API de Sportmonks y obtener información de fútbol.
@@ -40,5 +40,9 @@ sportmonksRouter.get('/processRoundFantasyPoints/:roundId', processRoundFantasyP
 sportmonksRouter.get("/seasonActual", getSeasonId as RequestHandler);
 sportmonksRouter.get("/jornadasBySeason/:seasonId", getRoundsBySeason as RequestHandler);
 
-
+/**
+ * @route GET /teams
+ * @description Obtiene los equipos de la temporada actual de La Liga.
+ */
+sportmonksRouter.get("/teams", getTeams);
 export default sportmonksRouter;

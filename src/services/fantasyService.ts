@@ -61,22 +61,26 @@ export const getFixtureEvents = async (fixtureId: number): Promise<Event[]> => {
 };
 
 /**
- * Retorna los puntos para un evento según las reglas:
+ * Retorna los puntos para un evento (excepto goles, que se gestionan por separado):
  * - 18: Sustitución (0 puntos, solo marca que jugó)
- * - 16: Penalti marcado: +4 puntos
  * - 15: Asistencia: +3 puntos
+ * - 16: Penalti marcado: +4 puntos
  * - 19: Tarjeta amarilla: -1 punto
  * - 20: Falta grave: -3 puntos
  * Otros tipos se ignoran.
+ *
+ * Nota: El evento de gol (type_id 14) se gestiona en el loop de eventos para asignar además la asistencia.
  */
 export const getPointsForEvent = (event: Event): number => {
   switch (event.type_id) {
     case 18:
       return 0;
-    case 16:
-      return 4;
+    case 14:
+      return 0; // Se gestiona de forma especial en el loop.
     case 15:
       return 3;
+    case 16:
+      return 4;
     case 19:
       return -1;
     case 20:
@@ -144,7 +148,7 @@ const getPointsForStat = ({ type_id, value }: { type_id: number; value: number }
       } else if (positionId === POSITION_DF) {
         if (value >= 10) points += 1;
       }
-      
+
       break;
     case 45: // Ball Possession % (solo MC)
       if (positionId === POSITION_MC) {
@@ -295,7 +299,7 @@ const getPointsForStat = ({ type_id, value }: { type_id: number; value: number }
       if (positionId === POSITION_DF) {
         if (value >= 60) points += 1;
       }
-      
+
       if (positionId === POSITION_MC) {
         if (value >= 60) points += 2;
         else if (value >= 55) points += 1;
@@ -387,7 +391,7 @@ const getPointsForStat = ({ type_id, value }: { type_id: number; value: number }
     default:
       break;
   }
-  
+
   return points;
 };
 
@@ -395,7 +399,7 @@ const getPointsForStat = ({ type_id, value }: { type_id: number; value: number }
  * Procesa un fixture y calcula los puntos fantasy para cada jugador.
  * Se obtienen las alineaciones, eventos y estadísticas para:
  *  - Asignar bono de 3 puntos a los titulares.
- *  - Sumar/restar puntos según los eventos (utilizando las propiedades correctas).
+ *  - Sumar/restar puntos según los eventos (incluyendo goles y asistencias).
  *  - Marcar como "jugó" al estar en la alineación o ingresar mediante sustitución.
  *  - Sumar puntos de estadísticas (según el criterio definido).
  *  
@@ -415,7 +419,7 @@ export const processFixtureFantasyPoints = async (
     params: { api_token: apiToken, include: 'statistics' }
   });
   const fixtureResult: FixtureResult = fixtureResponse.data.data;
-  
+
   // Inicializa el mapa de jugadores usando las alineaciones (titulares)
   const playerMap: Record<number, PlayerData> = {};
   lineups.forEach((player: any) => {
@@ -433,32 +437,67 @@ export const processFixtureFantasyPoints = async (
 
   // Procesa los eventos
   events.forEach((event: any) => {
-    // Se determina el playerId usando related_player_id o buscando por nombre en el mapa
-    let playerId: number | undefined = event.related_player_id;
-    if (!playerId) {
-      const found = Object.entries(playerMap).find(([_id, data]) => data.player_name === event.player_name);
-      if (found) {
-        playerId = Number(found[0]);
+    if (event.type_id === 14) {
+      // Evento de gol:
+      // Al goleador (player_id) se le suman +4
+      if (!playerMap[event.player_id]) {
+        playerMap[event.player_id] = {
+          player_name: event.player_name || '',
+          points: 0,
+          positionId: POSITION_MC,
+          starter: false,
+          team_id: event.participant_id,
+          played: false,
+        };
       }
-    }
 
-    if (!playerId) return;
-    if (!playerMap[playerId]) {
-      playerMap[playerId] = {
-        player_name: event.player_name || '',
-        points: 0,
-        positionId: POSITION_MC,
-        starter: false,
-        team_id: event.participant_id,
-        played: false,
-      };
-    }
+      playerMap[event.player_id].points += 4;
+      console.log('Gol procesado de', playerMap[event.player_id].player_name);
+      // Al asistente (related_player_id) se le suman +3, si existe
+      if (event.related_player_id) {
+        if (!playerMap[event.related_player_id]) {
+          playerMap[event.related_player_id] = {
+            player_name: event.related_player_name || '',
+            points: 0,
+            positionId: POSITION_MC,
+            starter: false,
+            team_id: event.participant_id,
+            played: false,
+          };
+        }
 
-    if (event.type_id === 18) {
-      playerMap[playerId].played = true;
+        playerMap[event.related_player_id].points += 3;
+        console.log('Asistencia procesada de', playerMap[event.related_player_id].
+          player_name);
+      }
     } else {
-      const pts = getPointsForEvent(event as Event);
-      playerMap[playerId].points += pts;
+      // Para otros eventos, se determina el jugador a partir de related_player_id o por nombre
+      let playerId: number | undefined = event.related_player_id;
+      if (!playerId) {
+        const found = Object.entries(playerMap).find(([_id, data]) => data.player_name === event.player_name);
+        if (found) {
+          playerId = Number(found[0]);
+        }
+      }
+
+      if (!playerId) return;
+      if (!playerMap[playerId]) {
+        playerMap[playerId] = {
+          player_name: event.player_name || '',
+          points: 0,
+          positionId: POSITION_MC,
+          starter: false,
+          team_id: event.participant_id,
+          played: false,
+        };
+      }
+
+      if (event.type_id === 18) {
+        playerMap[playerId].played = true;
+      } else {
+        const pts = getPointsForEvent(event as Event);
+        playerMap[playerId].points += pts;
+      }
     }
   });
 
