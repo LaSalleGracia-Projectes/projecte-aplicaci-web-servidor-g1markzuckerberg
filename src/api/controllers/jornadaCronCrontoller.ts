@@ -15,7 +15,7 @@ import type Round from '../../types/Round.js';
 const SPORTMONKS_API_BASE = 'http://localhost:3000/api/v1/sportmonks';
 
 /**
- * 🔹 Obtiene el season_id actual y verifica si es diferente al almacenado en la BD.
+ * Obtiene el season_id actual y verifica si es diferente al almacenado en la BD.
  * Solo si es nuevo, actualiza/inserta TODAS las jornadas de la temporada en Supabase.
  */
 const updateAllJornadas = async () => {
@@ -56,7 +56,7 @@ const updateAllJornadas = async () => {
 };
 
 /**
- * 🔹 Obtiene la jornada actual desde la API y actualiza en Supabase solo el campo `is_current` si ha cambiado.
+ * Obtiene la jornada actual desde la API y actualiza en Supabase solo el campo `is_current` si ha cambiado.
  */
 const updateJornadaJob = async () => {
   try {
@@ -91,7 +91,7 @@ const updateJornadaJob = async () => {
 };
 
 /**
- * 🔹 Inicia el cron job:
+ * Inicia el cron job:
  *   - Cada 1 minuto: Verifica si hay una nueva temporada y actualiza TODAS las jornadas de la temporada en Supabase.
  *   - Cada 30 segundos: Verifica si la jornada actual ha cambiado y actualiza el campo `is_current`.
  */

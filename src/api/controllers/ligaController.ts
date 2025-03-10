@@ -6,7 +6,7 @@ import type Liga from '../../types/Liga.js';
 import httpStatus from '../config/httpStatusCodes.js';
 
 /**
- * 🔹 **Crear una nueva liga.**
+ * **Crear una nueva liga.**
  * - Se obtiene la jornada actual.
  * - Se usa el correo del usuario autenticado como `created_by`.
  * - Se guarda el número de jornada en `created_jornada`.
@@ -56,7 +56,7 @@ const createLiga = async (req: Request, res: Response, next: NextFunction) => {
 };
 
 /**
- * 🔹 Unirse a una liga por código (requiere autenticación)
+ * Unirse a una liga por código (requiere autenticación)
  * - Busca la liga por `code`.
  * - Agrega al usuario autenticado en la tabla `usuarios_ligas`.
  */
@@ -89,7 +89,7 @@ const joinLiga = async (req: Request, res: Response, next: NextFunction) => {
 };
 
 /**
- * 🔹 **Obtener usuarios de una liga por código y jornada opcional.**
+ * **Obtener usuarios de una liga por código y jornada opcional.**
  * - Busca la liga por `code`.
  * - Si no se proporciona `jornada`, usa la **jornada actual (`is_current = true`)**.
  * - **Si la jornada solicitada es menor que `created_jornada`, devuelve error.**

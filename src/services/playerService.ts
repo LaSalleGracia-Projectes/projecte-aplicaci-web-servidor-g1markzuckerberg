@@ -1,45 +1,52 @@
 import axios, { type AxiosResponse } from "axios";
 import type PlayerApiResponse from "../types/PlayerAPIResponse";
 import type SquadApiResponse from "../types/SquadAPIResponse";
+import type Player from "../types/Player";
 import dotenv from "dotenv";
 dotenv.config();
 
 const apiToken = process.env.API_TOKEN;
+const backendUrl = "http://localhost:3000/api/v1/sportmonks/seasonActual";
+const sportmonksApiUrl = "https://api.sportmonks.com/v3/football/teams/seasons/";
 
-// 👇 Array con IDs de equipos
-const teamIds = [
-    83,    // FC Barcelona
-    3468,  // Real Madrid
-    7980,  // Atlético
-    13258, // Athletic
-    3477,  // Villarreal
-    377,   // Rayo Vallecano
-    594,   // Real Sociedad
-    231,   // Girona
-    459,   // Osasuna
-    645,   // Mallorca
-    485,   // Real Betis
-    36,    // Celta de Vigo
-    676,   // Sevilla
-    106,   // Getafe
-    2921,  // Las Palmas
-    528,   // Espanyol
-    844,   // Leganés
-    214,   // Valencia
-    2975,  // Deportivo Alavés
-    361    // Real Valladolid
-];
-
-async function getPlayersFromTeam(teamId: number) {
+/**
+ * Obtiene la temporada actual desde el backend.
+ * @returns {Promise<number>} ID de la temporada actual.
+ */
+async function getSeasonId(): Promise<number> {
     try {
-        // 1. Obtener la lista de jugadores (plantilla) del equipo
+        const response: AxiosResponse<{ season_id: number }> = await axios.get(backendUrl);
+        return response.data.season_id;
+    } catch (error) {
+        console.error("Error obteniendo la season_id:", error);
+        throw new Error(String(error));
+    }
+}
+
+/**
+ * Obtiene los equipos de la temporada actual.
+ * @returns {Promise<Array<{ id: number, name: string, imagePath: string }>>} Lista de equipos con ID, nombre e imagen.
+ */
+async function getTeamIds(seasonId: number): Promise<number[]> {
+    try {
+        const response: AxiosResponse<{ data: Array<{ id: number }> }> = await axios.get(
+            `${sportmonksApiUrl}${seasonId}?api_token=${apiToken}`
+        );
+        return response.data.data.map(team => team.id);
+    } catch (error) {
+        console.error("Error obteniendo los equipos de la temporada:", error);
+        throw new Error(String(error));
+    }
+}
+
+async function getPlayersFromTeam(teamId: number): Promise<Player[]> {
+    try {
         const squadResponse: AxiosResponse<{ data: SquadApiResponse[] }> = await axios.get<{ data: SquadApiResponse[] }>(
             `https://api.sportmonks.com/v3/football/squads/teams/${teamId}?api_token=${apiToken}`
         );
 
         const players = squadResponse.data.data;
 
-        // 2. Obtener información detallada de cada jugador
         const playerDetailsPromises = players.map(async (player) => {
             const playerResponse = await axios.get<{ data: PlayerApiResponse }>(
                 `https://api.sportmonks.com/v3/football/players/${player.player_id}?api_token=${apiToken}`
@@ -47,37 +54,40 @@ async function getPlayersFromTeam(teamId: number) {
 
             const playerData = playerResponse.data.data;
 
-            // Convertimos (opcionalmente) a camelCase
             return {
-                _id: playerData.id,
+                id: playerData.id,
                 teamId,
                 positionId: playerData.position_id,
-                displayName: playerData.display_name,
-                imagePath: playerData.image_path,
-                points: []
+                displayName: playerData.display_name ?? "",
+                imagePath: playerData.image_path ?? "",
             };
         });
 
-        // Esperamos a que finalicen todas las llamadas
-        const formattedPlayers = await Promise.all(playerDetailsPromises);
-        return formattedPlayers;
+        const playerDetails = await Promise.all(playerDetailsPromises);
+        return playerDetails as Player[];
     } catch (error) {
         console.error(`Error obteniendo jugadores del equipo ${teamId}:`, error);
         return [];
     }
 }
 
-async function getAllPlayersFromTeams() {
-    const allPlayers: any[] = [];
+async function getAllPlayersFromTeams(): Promise<Player[]> {
+    try {
+        const seasonId = await getSeasonId();
+        const teamIds = await getTeamIds(seasonId);
 
-    for (const teamId of teamIds) {
-        // eslint-disable-next-line no-await-in-loop
-        const playersOfTeam = await getPlayersFromTeam(teamId);
-        allPlayers.push(...playersOfTeam);
+        const allPlayers: Player[] = await Promise.all(
+            teamIds.map(async (teamId): Promise<Player[]> => {
+                const playersOfTeam: Player[] = await getPlayersFromTeam(teamId);
+                return playersOfTeam;
+            })
+        ).then((results: Player[][]): Player[] => results.flat());
+
+        return allPlayers;
+    } catch (error) {
+        console.error("Error en la obtención de jugadores:", error);
+        return [];
     }
-
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
-    return allPlayers;
 }
 
 export { getAllPlayersFromTeams };
