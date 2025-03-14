@@ -4,7 +4,7 @@ import httpStatus from '../config/httpStatusCodes.js';
 import { updateUsernameService, updateBirthDateService, updatePasswordService } from '../../services/userService.js';
 
 /**
- * 🔹 **Sube la imagen de perfil del usuario y guarda la URL en la base de datos.**
+ * **Sube la imagen de perfil del usuario y guarda la URL en la base de datos.**
  * - 📤 Guarda la imagen en `public/img/users/{userId}.jpg`
  */
 const uploadUserImageController = async (req: Request, res: Response, next: NextFunction) => {

@@ -5,7 +5,7 @@ import type Round from '../types/Round.js';
 import type Season from '../types/Season.js';
 
 /**
- * 🔹 Obtiene la jornada actual (is_current = true).
+ * Obtiene la jornada actual (is_current = true).
  */
 export const getCurrentJornada = async (): Promise<Round | undefined> => {
   try {
@@ -22,7 +22,7 @@ export const getCurrentJornada = async (): Promise<Round | undefined> => {
 };
 
 /**
- * 🔹 Verifica si la temporada ya existe en la base de datos.
+ * Verifica si la temporada ya existe en la base de datos.
  */
 export const seasonExists = async (seasonId: number): Promise<boolean> => {
   try {
@@ -39,7 +39,7 @@ export const seasonExists = async (seasonId: number): Promise<boolean> => {
 };
 
 /**
- * 🔹 Inserta una nueva temporada en la base de datos si no existe.
+ * Inserta una nueva temporada en la base de datos si no existe.
  */
 export const insertSeason = async (seasonId: number): Promise<boolean> => {
   try {
@@ -58,7 +58,7 @@ export const insertSeason = async (seasonId: number): Promise<boolean> => {
 };
 
 /**
- * 🔹 Actualiza la jornada actual en Supabase sin duplicados.
+ * Actualiza la jornada actual en Supabase sin duplicados.
  * - Desactiva la jornada anterior (`is_current = FALSE`).
  * - Activa la nueva jornada (`is_current = TRUE`).
  */
@@ -97,7 +97,7 @@ export const updateJornadaService = async (jornada: Round): Promise<Round | unde
 };
 
 /**
- * 🔹 Obtiene una jornada por su `name` (que representa el número de jornada).
+ * Obtiene una jornada por su `name` (que representa el número de jornada).
  */
 export const getJornadaByName = async (name: string): Promise<Round | undefined> => {
   try {
@@ -114,7 +114,7 @@ export const getJornadaByName = async (name: string): Promise<Round | undefined>
 };
 
 /**
- * 🔹 Inserta todas las jornadas en la base de datos si no existen.
+ * Inserta todas las jornadas en la base de datos si no existen.
  */
 export const insertJornadasIfNotExist = async (jornadas: Round[]) => {
   try {

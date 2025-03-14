@@ -4,5 +4,6 @@ interface PlayerApiResponse {
     position_id: number;
     display_name?: string;
     image_path?: string;
+
 }
 export default PlayerApiResponse;
