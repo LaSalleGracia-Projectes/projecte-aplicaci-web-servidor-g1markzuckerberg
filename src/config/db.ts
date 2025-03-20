@@ -22,7 +22,7 @@ const createPostgresConnection = async () => {
     const connectionString = process.env.DATABASE_URL ?? '';
     const sql = postgres(connectionString);
     console.log('✅ Connected to PostgreSQL (Supabase)');
-    return sql; // Retorna la conexión SQL para usarla en otras partes del código
+    return sql;
   } catch (error) {
     console.log('❌ ERROR Cannot connect to PostgreSQL:', error);
     throw new Error('❌ ERROR Cannot connect to PostgreSQL: ' + String(error.message));

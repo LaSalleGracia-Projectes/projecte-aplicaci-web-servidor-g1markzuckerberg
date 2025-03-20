@@ -1,0 +1,1 @@
+export const jugadoresEquipos = 'jugadores_equipos_season'; // Nombre de la tabla en Supabase
