@@ -51,7 +51,7 @@ const findLigaByCodeService = async (code: string): Promise<Liga | undefined> =>
 };
 
 /**
- * 🔹 Agregar un usuario a una liga en la tabla de relación
+ * Agregar un usuario a una liga en la tabla de relación
  * @param usuario_id - ID del usuario
  * @param liga_id - ID de la liga
  * @param is_capitan - Booleano para indicar si el usuario es capitán
@@ -72,7 +72,7 @@ const addUserToLigaService = async (usuario_id: number, liga_id: number, is_capi
 };
 
 /**
- * 🔹 Obtener usuarios de una liga por código y jornada opcional usando la función `get_puntos_acumulados6`
+ * Obtener usuarios de una liga por código y jornada opcional usando la función `get_puntos_acumulados6`
  * - Si no se proporciona jornada, usa la jornada actual.
  * - Convierte `code` de liga en `id` de liga.
  * - Convierte `name` de jornada en `id` de jornada.
@@ -137,7 +137,7 @@ const getUsersByLigaService = async (ligaCode: string, jornadaName?: string) => 
 };
 
 /**
- * 🔹 **Verifica si un usuario está en una liga.**
+ * **Verifica si un usuario está en una liga.**
  * @param usuarioId - ID del usuario.
  * @param ligaId - ID de la liga.
  * @returns {Promise<boolean>} - `true` si el usuario está en la liga, `false` en caso contrario.

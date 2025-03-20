@@ -2,7 +2,7 @@ import { type Request, type Response } from 'express';
 import { getAllPlayersFromTeams } from '../../services/playerService.js';
 import { getFixturesByRoundNumber, getCurrentRounds, getCurrentSeasonId, getRoundsBySeasonId } from '../../services/fixturesService.js';
 import { processRoundFantasyPoints } from '../../services/fantasyService.js';
-
+import { getTeamsByCurrentSeason } from '../../services/teamService.js';
 /**
  * Controlador para obtener todos los jugadores de los equipos disponibles.
  *
@@ -131,8 +131,8 @@ export const getSeasonId = async (req: Request, res: Response) => {
 export const getRoundsBySeason = async (req: Request, res: Response) => {
     try {
         // eslint-disable-next-line @typescript-eslint/naming-convention
-        const { season_id } = req.params;
-        const seasonIdNumber = Number(season_id);
+        const { seasonId } = req.params;
+        const seasonIdNumber = Number(seasonId);
 
         if (isNaN(seasonIdNumber)) {
             return res.status(400).json({ error: 'El season_id debe ser un número válido.' });
@@ -150,3 +150,17 @@ export const getRoundsBySeason = async (req: Request, res: Response) => {
         res.status(500).json({ error: 'Error interno del servidor' });
     }
 };
+
+/**
+ * Controller que devuelve los equipos de la temporada actual de La Liga.
+ * @param req
+ * @param res id, name, imagePath
+ */
+export const getTeams = async (req: Request, res: Response) => {
+    try {
+        const teams = await getTeamsByCurrentSeason();
+        res.json(teams);
+    } catch (_) {
+        res.status(500).json({ message: "Error al obtener los equipos" });
+    }
+}
