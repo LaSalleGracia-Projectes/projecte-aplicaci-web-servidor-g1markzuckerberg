@@ -95,24 +95,24 @@ async function getAllPlayersFromTeams(): Promise<Player[]> {
 
 async function uploadPlayersToSupabase(players: Player[]): Promise<void> {
     try {
-      const promises = players.map(async player => sql`
-          INSERT INTO ${sql(jugadoresTable)} (id, "displayName", "positionId", "imagePath", estrellas, puntos_totales)
-          VALUES (
+    const promises = players.map(async player => sql`
+        INSERT INTO ${sql(jugadoresTable)} (id, "displayName", "positionId", "imagePath", estrellas, puntos_totales)
+        VALUES (
             ${player.id},
             ${player.displayName},
             ${player.positionId},
             ${player.imagePath},
             ${player.estrellas ?? 1},
             ${player.puntos_totales ?? 0}
-          )
-          ON CONFLICT (id) DO NOTHING
-        `);
-      
-      await Promise.all(promises);
-      console.log("✅ Jugadores subidos correctamente a Supabase");
+        )
+        ON CONFLICT (id) DO NOTHING
+    `);
+
+    await Promise.all(promises);
+    console.log("✅ Jugadores subidos correctamente a Supabase");
     } catch (error: any) {
-      console.error("Error subiendo jugadores a Supabase:", error);
-      throw new Error(`Error subiendo jugadores a Supabase: ${error.message}`);
+        console.error("Error subiendo jugadores a Supabase:", error);
+        throw new Error(`Error subiendo jugadores a Supabase: ${error.message}`);
     }
 }
 
@@ -127,31 +127,30 @@ async function uploadPlayersToSupabase(players: Player[]): Promise<void> {
  */
 async function uploadJugadorEquipoSeasonRelation(players: Player[], seasonId: number): Promise<void> {
     try {
-      const promises = players.map(async (player) => {
+        const promises = players.map(async (player) => {
         // Verificar si ya existe la relación para este jugador, equipo y temporada
         const existing = await sql`
-          SELECT 1 FROM ${sql(jugadoresEquipos)}
-          WHERE jugador_id = ${player.id} 
+            SELECT 1 FROM ${sql(jugadoresEquipos)}
+            WHERE jugador_id = ${player.id} 
             AND equipo_id = ${player.teamId} 
             AND season_id = ${seasonId}
-          LIMIT 1
+            LIMIT 1
         `;
         // Si no existe, se inserta la relación
         if (existing.length === 0) {
-          return sql`
-            INSERT INTO ${sql(jugadoresEquipos)} (jugador_id, equipo_id, season_id)
-            VALUES (${player.id}, ${player.teamId}, ${seasonId})
-          `;
+            return sql`
+                INSERT INTO ${sql(jugadoresEquipos)} (jugador_id, equipo_id, season_id)
+                VALUES (${player.id}, ${player.teamId}, ${seasonId})
+            `;
         }
-      });
-  
-      await Promise.all(promises);
-      console.log("✅ Relación jugador-equipo-temporada insertada correctamente.");
+    });
+
+    await Promise.all(promises);
+    console.log("✅ Relación jugador-equipo-temporada insertada correctamente.");
     } catch (error: any) {
-      console.error("Error subiendo relación jugador-equipo-temporada:", error);
-      throw new Error(`Error subiendo relación jugador-equipo-temporada: ${error.message}`);
+        console.error("Error subiendo relación jugador-equipo-temporada:", error);
+        throw new Error(`Error subiendo relación jugador-equipo-temporada: ${error.message}`);
     }
 }
-  
 
 export { getAllPlayersFromTeams, uploadPlayersToSupabase, uploadJugadorEquipoSeasonRelation };

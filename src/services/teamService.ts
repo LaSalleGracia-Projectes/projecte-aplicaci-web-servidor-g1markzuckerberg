@@ -49,7 +49,7 @@ async function uploadTeamsToSupabase(teams: Team[]): Promise<void> {
         );
 
         await Promise.all(promises);
-        console.log("Equipos subidos correctamente a Supabase");
+        console.log("✅ Equipos subidos correctamente a Supabase.");
     } catch (error: any) {
         console.error("Error subiendo equipos a Supabase:", error);
         throw new Error(`Error subiendo equipos a Supabase: ${error.message}`);
