@@ -31,31 +31,28 @@ const updateJornadasTeamsPlayers = async () => {
       return;
     }
 
-    
     // (OPCIONAL) Verificación e inserción de la temporada y jornadas, si quisieras activarlo en otro momento:
-     const seasonExistsInDb = await seasonExists(seasonId);
-     if (seasonExistsInDb) {
-       console.log(`🔄 La temporada ${seasonId} ya está en la base de datos. No se actualizarán las jornadas.`);
-       return;
-     }
+      const seasonExistsInDb = await seasonExists(seasonId);
+      if (seasonExistsInDb) {
+        console.log(`🔄 La temporada ${seasonId} ya está en la base de datos. No se actualizarán las jornadas.`);
+        return;
+      }
 
-     await insertSeason(seasonId, new Date().toISOString());
-     console.log(`✅ Nueva temporada ${seasonId} insertada en la base de datos.`);
+      await insertSeason(seasonId, new Date().toISOString());
+      console.log(`✅ Nueva temporada ${seasonId} insertada en la base de datos.`);
 
-     const jornadas = await getRoundsBySeasonId(seasonId);
-     if (!jornadas || jornadas.length === 0) {
-       console.warn('⚠️ No se encontraron jornadas para la temporada actual.');
-       return;
+      const jornadas = await getRoundsBySeasonId(seasonId);
+      if (!jornadas || jornadas.length === 0) {
+        console.warn('⚠️ No se encontraron jornadas para la temporada actual.');
+        return;
     }
 
     await insertJornadasIfNotExist(jornadas);
     console.log(`✅ Se han insertado o actualizado ${jornadas.length} jornadas en la base de datos.`);
   
-
     // 2. Obtener equipos de la temporada actual y subirlos a Supabase
     const equipos = await getTeamsByCurrentSeason();
     await uploadTeamsToSupabase(equipos);
-    console.log("✅ Equipos subidos correctamente a Supabase.");
 
     // 3. Obtener todos los jugadores de todos los equipos
     const jugadores = await getAllPlayersFromTeams();
