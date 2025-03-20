@@ -10,7 +10,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Configura multer para almacenar archivos en el directorio deseado
 const storage = multer.diskStorage({
   destination(req: Request, file: Express.Multer.File, cb) {
-    const dir = path.join(__dirname, '../../../public/img');
+    const dir = path.join(__dirname, '../../../public/img/users');
 
     // Crea el directorio si no existe
     if (!fs.existsSync(dir)) {

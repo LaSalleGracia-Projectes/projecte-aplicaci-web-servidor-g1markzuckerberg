@@ -1,0 +1,1 @@
+export const jugadoresTable = 'jugadores'; // Nombre de la tabla en Supabase

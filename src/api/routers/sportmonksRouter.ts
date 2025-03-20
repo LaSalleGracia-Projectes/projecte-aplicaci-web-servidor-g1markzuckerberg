@@ -44,5 +44,5 @@ sportmonksRouter.get("/jornadasBySeason/:seasonId", getRoundsBySeason as Request
  * @route GET /teams
  * @description Obtiene los equipos de la temporada actual de La Liga.
  */
-sportmonksRouter.get("/teams", getTeams);
+sportmonksRouter.get("/teams", getTeams as RequestHandler);
 export default sportmonksRouter;

@@ -41,15 +41,14 @@ export const seasonExists = async (seasonId: number): Promise<boolean> => {
 /**
  * Inserta una nueva temporada en la base de datos si no existe.
  */
-export const insertSeason = async (seasonId: number): Promise<boolean> => {
+export const insertSeason = async (seasonId: number, createdAt: string): Promise<boolean> => {
   try {
     await sql`
-      INSERT INTO ${sql(seasonsTable)} (id)
-      VALUES (${seasonId})
+      INSERT INTO ${sql(seasonsTable)} (id, created_at)
+      VALUES (${seasonId}, ${createdAt})
       ON CONFLICT (id) DO NOTHING;
     `;
-
-    console.log(`✅ Temporada ${seasonId} insertada correctamente.`);
+    console.log(`✅ Temporada ${seasonId} insertada correctamente con created_at = ${createdAt}.`);
     return true;
   } catch (error) {
     console.error(`❌ Error al insertar la temporada en la base de datos:`, error);
