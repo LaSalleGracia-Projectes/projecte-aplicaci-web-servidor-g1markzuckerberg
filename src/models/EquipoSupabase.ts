@@ -1,0 +1,1 @@
+export const equiposTable = 'equipos'; // Nombre de la tabla en Supabase

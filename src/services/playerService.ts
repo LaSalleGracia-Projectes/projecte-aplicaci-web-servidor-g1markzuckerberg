@@ -1,8 +1,11 @@
 import axios, { type AxiosResponse } from "axios";
-import type PlayerApiResponse from "../types/PlayerAPIResponse";
-import type SquadApiResponse from "../types/SquadAPIResponse";
-import type Player from "../types/Player";
+import { sql } from "./supabaseService.js";
+import type PlayerApiResponse from "../types/PlayerAPIResponse.js";
+import type SquadApiResponse from "../types/SquadAPIResponse.js";
+import type Player from "../types/Player.js";
 import dotenv from "dotenv";
+import { jugadoresTable } from "../models/PlayerSupabase.js";
+import { jugadoresEquipos } from "../models/JugadorEquipoSeason.js";
 dotenv.config();
 
 const apiToken = process.env.API_TOKEN;
@@ -90,4 +93,64 @@ async function getAllPlayersFromTeams(): Promise<Player[]> {
     }
 }
 
-export { getAllPlayersFromTeams };
+async function uploadPlayersToSupabase(players: Player[]): Promise<void> {
+    try {
+    const promises = players.map(async player => sql`
+        INSERT INTO ${sql(jugadoresTable)} (id, "displayName", "positionId", "imagePath", estrellas, puntos_totales)
+        VALUES (
+            ${player.id},
+            ${player.displayName},
+            ${player.positionId},
+            ${player.imagePath},
+            ${player.estrellas ?? 1},
+            ${player.puntos_totales ?? 0}
+        )
+        ON CONFLICT (id) DO NOTHING
+    `);
+
+    await Promise.all(promises);
+    console.log("✅ Jugadores subidos correctamente a Supabase");
+    } catch (error: any) {
+        console.error("Error subiendo jugadores a Supabase:", error);
+        throw new Error(`Error subiendo jugadores a Supabase: ${error.message}`);
+    }
+}
+
+// 6. Inserta la relación en la tabla "jugadores_equipos_season"
+/**
+ * Inserta la relación entre jugador, equipo y temporada en la tabla "jugadores_equipos_season".
+ * Se requiere que la tabla tenga una restricción UNIQUE en (jugador_id, equipo_id, season_id)
+ * para que la cláusula ON CONFLICT funcione correctamente.
+ *
+ * @param players - Lista de jugadores, cada uno debe tener la propiedad teamId.
+ * @param seasonId - ID de la temporada actual.
+ */
+async function uploadJugadorEquipoSeasonRelation(players: Player[], seasonId: number): Promise<void> {
+    try {
+        const promises = players.map(async (player) => {
+        // Verificar si ya existe la relación para este jugador, equipo y temporada
+        const existing = await sql`
+            SELECT 1 FROM ${sql(jugadoresEquipos)}
+            WHERE jugador_id = ${player.id} 
+            AND equipo_id = ${player.teamId} 
+            AND season_id = ${seasonId}
+            LIMIT 1
+        `;
+        // Si no existe, se inserta la relación
+        if (existing.length === 0) {
+            return sql`
+                INSERT INTO ${sql(jugadoresEquipos)} (jugador_id, equipo_id, season_id)
+                VALUES (${player.id}, ${player.teamId}, ${seasonId})
+            `;
+        }
+    });
+
+    await Promise.all(promises);
+    console.log("✅ Relación jugador-equipo-temporada insertada correctamente.");
+    } catch (error: any) {
+        console.error("Error subiendo relación jugador-equipo-temporada:", error);
+        throw new Error(`Error subiendo relación jugador-equipo-temporada: ${error.message}`);
+    }
+}
+
+export { getAllPlayersFromTeams, uploadPlayersToSupabase, uploadJugadorEquipoSeasonRelation };
