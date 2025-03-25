@@ -2,12 +2,12 @@
 /* eslint-disable @typescript-eslint/naming-convention, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return */
 import axios from 'axios';
 import dotenv from 'dotenv';
-import fs from 'fs';
 import type Fixture from '../types/Fixture';
 import type { RoundData } from '../types/RoundData';
 import type Event from '../types/Event';
 import type LineupPlayer from '../types/LineupPlayer';
 import type FixtureResult from '../types/FixtureResult';
+import type { PlayerData } from '../types/PlayerData';
 dotenv.config();
 
 const apiToken: string = process.env.API_TOKEN ?? '';
@@ -17,18 +17,6 @@ const POSITION_POR = 24;
 const POSITION_DF = 25;
 const POSITION_MC = 26;
 const POSITION_DL = 27;
-
-/**
- * Interfaz extendida para almacenar la información de cada jugador.
- */
-interface PlayerData {
-  player_name: string;
-  points: number;
-  positionId: number;
-  starter: boolean;
-  team_id: number;
-  played: boolean;
-}
 
 /**
  * Obtiene las alineaciones (lineups) directamente del endpoint.
@@ -99,66 +87,67 @@ const getPointsForStat = ({ type_id, value }: { type_id: number; value: number }
   switch (type_id) {
     case 34: // Offsides (solo DL)
       if (positionId === POSITION_DL) {
-        if (value >= 10) points -= 2;
-        else if (value >= 5) points -= 1;
+        if (value >= 8) points -= 2;
+        else if (value >= 4) points -= 1;
       }
 
       break;
     // 41 – Captain se ignora
     case 42: // Shots Total
       if (positionId === POSITION_DL) {
-        if (value >= 20) points += 3;
-        else if (value >= 15) points += 2;
-        else if (value >= 10) points += 1;
-        else if (value >= 5) points += 0;
+        if (value >= 26) points += 3;
+        else if (value >= 21) points += 2;
+        else if (value >= 16) points += 1;
+        else if (value >= 11) points += 0;
         else points -= 1;
       } else if (positionId === POSITION_MC) {
-        if (value >= 20) points += 2;
-        else if (value >= 15) points += 1;
+        if (value >= 26) points += 1;
+        else if (value >= 21) points += 0;
       } else if (positionId === POSITION_DF) {
-        if (value >= 20) points += 1;
+        if (value >= 26) points += 1;
       }
 
       break;
     case 43: // Attacks
       if (positionId === POSITION_DL) {
-        if (value >= 20) points += 3;
-        else if (value >= 15) points += 2;
-        else if (value >= 10) points += 1;
-        else if (value >= 5) points += 0;
+        if (value >= 100) points += 3;
+        else if (value >= 90) points += 2;
+        else if (value >= 80) points += 1;
+        else if (value >= 65) points += 0;
         else points -= 1;
       } else if (positionId === POSITION_MC) {
-        if (value >= 20) points += 2;
-        else if (value >= 15) points += 1;
+        if (value >= 90) points += 2;
+        else if (value >= 80) points += 1;
       } else if (positionId === POSITION_DF) {
-        if (value >= 20) points += 1;
+        if (value >= 90) points += 1;
       }
 
       break;
     case 44: // Dangerous Attacks
       if (positionId === POSITION_DL) {
-        if (value >= 10) points += 3;
-        else if (value >= 7) points += 2;
-        else if (value >= 4) points += 1;
-        else if (value >= 2) points += 0;
+        if (value >= 48) points += 3;
+        else if (value >= 42) points += 2;
+        else if (value >= 35) points += 1;
+        else if (value >= 27) points += 0;
         else points -= 1;
       } else if (positionId === POSITION_MC) {
-        if (value >= 10) points += 2;
-        else if (value >= 7) points += 1;
+        if (value >= 48) points += 2;
+        else if (value >= 35) points += 1;
       } else if (positionId === POSITION_DF) {
-        if (value >= 10) points += 1;
+        if (value >= 48) points += 1;
       }
 
       break;
     case 45: // Ball Possession % (solo MC)
       if (positionId === POSITION_MC) {
-        if (value >= 65) points += 2;
-        else if (value >= 50) points += 1;
-        else if (value >= 35) points += 0;
+        if (value >= 70) points += 2;
+        else if (value >= 55) points += 1;
+        else if (value >= 38) points += 0;
         else points -= 1;
       }
 
       break;
+
     case 46: // Ball Safe (solo POR)
       if (positionId === POSITION_POR) {
         if (value >= 10) points += 5;
@@ -179,6 +168,7 @@ const getPointsForStat = ({ type_id, value }: { type_id: number; value: number }
         else if (value >= 2) points += 1;
       }
 
+
       break;
     case 58: // Shots Blocked
       if (positionId === POSITION_DF) {
@@ -198,100 +188,100 @@ const getPointsForStat = ({ type_id, value }: { type_id: number; value: number }
       break;
     // 59 y 64 se ignoran
     case 65: // Successful Headers (DF, MC, DL)
-      if ((positionId === POSITION_DF || positionId === POSITION_MC || positionId === POSITION_DL) && value >= 10) {
+      if ((positionId === POSITION_DF || positionId === POSITION_MC || positionId === POSITION_DL) && value >= 6) {
         points += 1;
       }
 
       break;
     case 78: // Tackles
       if (positionId === POSITION_DF) {
-        if (value >= 10) points += 3;
-        else if (value >= 7) points += 2;
-        else if (value >= 3) points += 1;
+        if (value >= 25) points += 3;
+        else if (value >= 20) points += 2;
+        else if (value >= 14) points += 1;
       } else if (positionId === POSITION_MC) {
-        if (value >= 10) points += 2;
-        else if (value >= 7) points += 1;
+        if (value >= 25) points += 2;
+        else if (value >= 20) points += 1;
       }
 
       break;
     case 80: // Passes
       if (positionId === POSITION_DF) {
-        if (value >= 700) points += 3;
-        else if (value >= 500) points += 2;
-        else if (value >= 400) points += 1;
+        if (value >= 850) points += 3;
+        else if (value >= 650) points += 2;
+        else if (value >= 550) points += 1;
       } else if (positionId === POSITION_MC) {
-        if (value >= 700) points += 5;
-        else if (value >= 500) points += 4;
-        else if (value >= 400) points += 3;
-        else if (value >= 300) points += 2;
-        else if (value >= 200) points += 1;
-        else if (value >= 100) points += 0;
-        else points -= 1;
-      } else if (positionId === POSITION_DL) {
-        if (value >= 700) points += 3;
+        if (value >= 800) points += 4;
+        else if (value >= 600) points += 3;
         else if (value >= 500) points += 2;
         else if (value >= 400) points += 1;
+        else if (value >= 300) points += 0;
+        else if (value >= 200) points -= 1;
+        else points -= 2;
+      } else if (positionId === POSITION_DL) {
+        if (value >= 850) points += 3;
+        else if (value >= 650) points += 2;
+        else if (value >= 550) points += 1;
       }
 
       break;
     // 81 se ignora
     case 82: // Successful Passes Percentage
       if (positionId === POSITION_DF) {
-        if (value >= 87) points += 3;
-        else if (value >= 84) points += 2;
-        else if (value >= 81) points += 1;
+        if (value >= 94) points += 3;
+        else if (value >= 90) points += 2;
+        else if (value >= 87) points += 1;
       } else if (positionId === POSITION_MC) {
-        if (value >= 87) points += 5;
-        else if (value >= 84) points += 4;
-        else if (value >= 81) points += 3;
-        else if (value >= 78) points += 2;
-        else if (value >= 75) points += 1;
-        else if (value >= 71) points += 0;
+        if (value >= 95) points += 5;
+        else if (value >= 92) points += 4;
+        else if (value >= 89) points += 3;
+        else if (value >= 86) points += 2;
+        else if (value >= 83) points += 1;
+        else if (value >= 81) points += 0;
         else points -= 1;
       } else if (positionId === POSITION_DL) {
-        if (value >= 87) points += 3;
-        else if (value >= 84) points += 2;
-        else if (value >= 81) points += 1;
+        if (value >= 93) points += 3;
+        else if (value >= 88) points += 2;
+        else if (value >= 84) points += 1;
       }
 
       break;
     // 84 se ignora
     case 86: // Shots On Target
       if (positionId === POSITION_DL) {
-        if (value >= 14) points += 3;
-        else if (value >= 8) points += 2;
-        else if (value >= 4) points += 1;
+        if (value >= 16) points += 3;
+        else if (value >= 10) points += 2;
+        else if (value >= 7) points += 1;
         else points -= 1;
       } else if (positionId === POSITION_MC) {
-        if (value >= 14) points += 2;
-        else if (value >= 8) points += 1;
+        if (value >= 17) points += 2;
+        else if (value >= 12) points += 1;
       }
 
       break;
     case 98: // Total Crosses
       if (positionId === POSITION_MC) {
-        if (value >= 10) points += 2;
-        else if (value >= 5) points += 1;
+        if (value >= 23) points += 2;
+        else if (value >= 15) points += 1;
       } else if (positionId === POSITION_DL) {
-        if (value >= 10) points += 2;
-        else if (value >= 5) points += 1;
+        if (value >= 20) points += 2;
+        else if (value >= 14) points += 1;
       }
 
       break;
     case 99: // Accurate Crosses (solo DL)
-      if (positionId === POSITION_DL && value >= 6) {
+      if (positionId === POSITION_DL && value >= 7) {
         points += 1;
       }
 
       break;
     case 100: // Interceptions
       if (positionId === POSITION_DF) {
-        if (value >= 10) points += 3;
-        else if (value >= 7) points += 2;
-        else if (value >= 3) points += 1;
+        if (value >= 14) points += 3;
+        else if (value >= 10) points += 2;
+        else if (value >= 6) points += 1;
       } else if (positionId === POSITION_MC) {
-        if (value >= 10) points += 2;
-        else if (value >= 7) points += 1;
+        if (value >= 17) points += 2;
+        else if (value >= 14) points += 1;
       }
 
       break;
@@ -316,18 +306,18 @@ const getPointsForStat = ({ type_id, value }: { type_id: number; value: number }
       break;
     case 108: // Dribble Attempts
       if (positionId === POSITION_DF) {
-        if (value >= 25) points += 1;
+        if (value >= 30) points += 1;
       }
 
       if (positionId === POSITION_MC) {
-        if (value >= 25) points += 2;
-        else if (value >= 18) points += 1;
+        if (value >= 30) points += 2;
+        else if (value >= 20) points += 1;
         else if (value < 8) points -= 1;
       }
 
       if (positionId === POSITION_DL) {
-        if (value >= 25) points += 3;
-        else if (value >= 18) points += 2;
+        if (value >= 30) points += 3;
+        else if (value >= 20) points += 2;
         else if (value >= 13) points += 1;
         else if (value < 8) points -= 1;
       }
@@ -335,56 +325,56 @@ const getPointsForStat = ({ type_id, value }: { type_id: number; value: number }
       break;
     case 1605: // Successful Dribbles Percentage
       if (positionId === POSITION_MC) {
-        if (value >= 80) points += 1;
-        else if (value < 60) points -= 1;
+        if (value >= 77) points += 1;
+        else if (value < 50) points -= 1;
       }
 
       if (positionId === POSITION_DL) {
-        if (value >= 80) points += 2;
-        else if (value >= 70) points += 1;
-        else if (value < 60) points -= 1;
+        if (value >= 75) points += 2;
+        else if (value >= 60) points += 1;
+        else if (value < 50) points -= 1;
       }
 
       break;
     case 117: // Key Passes
       if (positionId === POSITION_DF) {
-        if (value >= 15) points += 1;
+        if (value >= 13) points += 1;
       }
 
       if (positionId === POSITION_MC) {
-        if (value >= 15) points += 3;
-        else if (value >= 10) points += 2;
-        else if (value >= 7) points += 1;
+        if (value >= 13) points += 2;
+        else if (value >= 10) points += 1;
+        else if (value >= 8) points += 0;
         else if (value <= 3) points -= 1;
       }
 
       if (positionId === POSITION_DL) {
-        if (value >= 15) points += 1;
-        else if (value >= 10) points += 1;
+        if (value >= 13) points += 1;
+        else if (value >= 8) points += 0;
         else if (value <= 3) points -= 1;
       }
 
       break;
     case 580: // Big Chances Created
       if (positionId === POSITION_MC) {
-        if (value >= 15) points += 1;
-        else if (value >= 10) points += 1;
+        if (value >= 7) points += 1;
+        else if (value >= 4) points += 1;
       }
 
       if (positionId === POSITION_DL) {
-        if (value >= 15) points += 2;
-        else if (value >= 10) points += 1;
+        if (value >= 6) points += 2;
+        else if (value >= 4) points += 1;
       }
 
       break;
     case 581: // Big Chances Missed
       if (positionId === POSITION_MC) {
-        if (value >= 15) points -= 1;
+        if (value >= 7) points -= 1;
       }
 
       if (positionId === POSITION_DL) {
-        if (value >= 15) points -= 2;
-        else if (value >= 10) points -= 1;
+        if (value >= 7) points -= 2;
+        else if (value >= 4) points -= 1;
       }
 
       break;
@@ -520,8 +510,6 @@ export const processFixtureFantasyPoints = async (
     points: data.points,
   }));
 
-  fs.writeFileSync('matchdayFantasyPoints.json', JSON.stringify(results, null, 2), 'utf-8');
-  console.log('Resultados de la jornada guardados en matchdayFantasyPoints.json');
   return results;
 };
 
