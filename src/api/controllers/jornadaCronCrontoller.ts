@@ -5,12 +5,14 @@ import {
   getCurrentJornada, 
   insertJornadasIfNotExist, 
   seasonExists, 
-  insertSeason 
+  insertSeason,
+  getAllJornadas
 } from '../../services/jornadaSupaService.js';
 import { getTeamsByCurrentSeason, uploadTeamsToSupabase } from '../../services/teamService.js';
 import { uploadJugadorEquipoSeasonRelation, uploadPlayersToSupabase, getAllPlayersFromTeams } from '../../services/playerService.js';
 import { getRoundsBySeasonId, getCurrentSeasonId } from '../../services/fixturesService.js';
 import type Round from '../../types/Round.js';
+import { uploadRoundFantasyPoints } from '../../services/jornadaJugadorService.js';
 
 // URL Base de la API Sportmonks
 // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -108,6 +110,64 @@ const updateJornadaJob = async () => {
   }
 };
 
+
+const executeFantasyPointsJob = async () => {
+  try {
+    console.log('⏳ Ejecutando carga de puntos fantasy desde jornada 1 hasta actual...');
+
+    const seasonId = await getCurrentSeasonId();
+    if (!seasonId) {
+      console.warn('⚠️ No se pudo obtener el season_id actual.');
+      return;
+    }
+
+    const allJornadas = await getAllJornadas(seasonId);
+
+    if (!allJornadas || allJornadas.length === 0) {
+      console.warn('⚠️ No se encontraron jornadas para esta temporada.');
+      return;
+    }
+
+    const currentJornada = allJornadas.find(jornada => jornada.is_current);
+
+    if (!currentJornada) {
+      console.warn('⚠️ No se encontró jornada actual.');
+      return;
+    }
+
+    const currentRoundNumber = parseInt(currentJornada.name, 10);
+
+    // Filtra solo las jornadas desde la primera hasta la actual, ordenadas numéricamente
+    const jornadasHastaActual = allJornadas
+      .filter(j => parseInt(j.name, 10) <= currentRoundNumber)
+      .sort((a, b) => parseInt(a.name, 10) - parseInt(b.name, 10));
+
+    for (const jornada of jornadasHastaActual) {
+      try {
+        console.log(`📍 Procesando puntos fantasy para la jornada ${jornada.name} (ID real: ${jornada.id})...`);
+        // eslint-disable-next-line no-await-in-loop
+        const results = await uploadRoundFantasyPoints(jornada.id);
+
+        if (results.length === 0) {
+          console.warn(`⚠️ La jornada ${jornada.name} no devolvió puntos fantasy.`);
+        } else {
+          console.log(`✅ Puntos fantasy para jornada ${jornada.name} actualizados.`);
+        }
+
+      } catch (error: any) {
+        console.error(`❌ Error procesando jornada ${jornada.name} (ID ${jornada.id}):`, error.response?.data ?? error.message);
+      }
+    }
+
+    console.log('✅ Todos los puntos fantasy han sido actualizados exitosamente.');
+
+  } catch (error) {
+    console.error('❌ Error al ejecutar el job de puntos fantasy:', error);
+  }
+};
+
+
+
 /**
  * Inicia el cron job:
  *   - Cada 1 minuto: Verifica si hay una nueva temporada y actualiza TODAS las jornadas de la temporada en Supabase.
@@ -120,6 +180,11 @@ const startJornadaCronJob = () => {
 
   cron.schedule('*/1 * * * *', () => {
     void updateJornadasTeamsPlayers();
+  });
+
+  cron.schedule('0 */5 * * *', () => {
+    console.log('🔄 Cron job de actualización de puntos fantasy iniciado cada 5h...');
+    void executeFantasyPointsJob();
   });
 
   console.log('🔄 Cron job de actualización de jornadas iniciado...');
