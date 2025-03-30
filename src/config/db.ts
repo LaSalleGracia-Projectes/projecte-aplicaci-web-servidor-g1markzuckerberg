@@ -19,7 +19,7 @@ const createMongoConnection = async () => {
 
 const createPostgresConnection = async () => {
   try {
-    const connectionString = process.env.DATABASE_URL2 ?? '';
+    const connectionString = process.env.DATABASE_URL ?? '';
     const sql = postgres(connectionString);
     console.log('✅ Connected to PostgreSQL (Supabase)');
     return sql;
