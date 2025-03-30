@@ -8,4 +8,5 @@ export interface PlayerData {
     starter: boolean;
     team_id: number;
     played: boolean;
+    statPoints?: number;
 }

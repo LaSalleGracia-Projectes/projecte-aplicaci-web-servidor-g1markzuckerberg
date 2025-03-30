@@ -135,3 +135,17 @@ export const insertJornadasIfNotExist = async (jornadas: Round[]) => {
     throw new Error(`Database error while inserting or updating jornadas`);
   }
 };
+
+export const getAllJornadas = async (seasonId: number): Promise<Round[]> => {
+  try {
+    const jornadas = await sql<Round[]>`
+      SELECT * FROM ${sql(jornadaTable)}
+      WHERE season_id = ${seasonId}
+      ORDER BY CAST(name AS INTEGER) ASC;
+    `;
+    return jornadas;
+  } catch (error) {
+    console.error(`❌ Error al obtener todas las jornadas:`, error);
+    throw new Error(`Database error while fetching all jornadas`);
+  }
+};

@@ -6,8 +6,8 @@ dotenv.config();
 
 
 // Se usan los operadores ! para asegurar que las variables de entorno no sean null ni undefined.
-const supabaseUrl: string = process.env.SUPABASE_URL!;
-const supabaseKey: string = process.env.SUPABASE_KEY!;
+const supabaseUrl: string = process.env.SUPABASE_URL2!;
+const supabaseKey: string = process.env.SUPABASE_KEY2!;
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 /**
