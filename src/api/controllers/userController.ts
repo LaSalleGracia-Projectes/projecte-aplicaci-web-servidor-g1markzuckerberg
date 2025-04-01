@@ -1,7 +1,9 @@
 import { type Request, type Response, type NextFunction } from 'express';
 import path from 'path';
 import httpStatus from '../config/httpStatusCodes.js';
-import { updateUsernameService, updateBirthDateService, updatePasswordService, getLeaguesByUserService } from '../../services/userService.js';
+import { updateUsernameService, updateBirthDateService, updatePasswordService, getLeaguesByUserService,
+  forgotPasswordService
+} from '../../services/userService.js';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 
@@ -149,5 +151,20 @@ const getUserImageController = async (req: Request, res: Response, next: NextFun
   }
 };
 
+const forgotPasswordController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { correo } = req.body as { correo: string };
+    if (!correo) {
+      return res.status(httpStatus.badRequest).json({ error: 'El correo es obligatorio' });
+    }
+
+    await forgotPasswordService(correo);
+    res.status(httpStatus.ok).json({ message: 'Nueva contraseña enviada al correo' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
 export { uploadUserImageController, updateUsernameController, updateBirthDateController,
-  updatePasswordController, getUserLeagues, getUserImageController };
+  updatePasswordController, getUserLeagues, getUserImageController, forgotPasswordController };

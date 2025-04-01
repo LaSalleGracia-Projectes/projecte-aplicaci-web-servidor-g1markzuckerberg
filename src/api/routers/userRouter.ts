@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { upload } from '../../api/middlewares/multerMiddleware.js';
 import authMiddleware from '../../api/middlewares/authMiddleware.js';
 import { uploadUserImageController, updateBirthDateController, updatePasswordController,
-  updateUsernameController, getUserLeagues, getUserImageController } from '../../api/controllers/userController.js';
+  updateUsernameController, getUserLeagues, getUserImageController, forgotPasswordController } from '../../api/controllers/userController.js';
 import validate from '../middlewares/joiValidation.js';
 import { updateBirthDateSchema, updatePwdSchema, updateUsernameSchema } from '../models/Joi/userSchemas.js';
 
@@ -19,6 +19,7 @@ userRouter.put('/update-birthDate', authMiddleware, validate(updateBirthDateSche
 // Ruta para actualizar la contraseña del usuario
 userRouter.put('/update-password', authMiddleware, validate(updatePwdSchema, 'body'), updatePasswordController);
 userRouter.get('/leagues', authMiddleware, getUserLeagues);
+userRouter.post('/forgot-password', forgotPasswordController);
 
 
 export default userRouter;
