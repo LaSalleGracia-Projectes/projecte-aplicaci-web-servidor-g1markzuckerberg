@@ -267,27 +267,22 @@ const getLeagueImageController = async (req: Request, res: Response, next: NextF
       return res.status(400).json({ error: 'No se proporcionó el ID de la liga.' });
     }
 
-    // Obtener la ruta del directorio de imágenes de ligas
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = path.dirname(__filename);
     const imageDir = path.join(__dirname, '../../../public/img/ligas');
 
-    // Listar los archivos del directorio y buscar el que corresponde a la liga
     const files = fs.readdirSync(imageDir);
     const imageFile = files.find(fileName => fileName.startsWith(`leagueImage${ligaId}`));
 
-    if (!imageFile) {
-      return res.status(404).json({ error: 'Imagen no encontrada.' });
-    }
+    const imagePath = imageFile
+      ? path.join(imageDir, imageFile)
+      : path.join(imageDir, 'defaultLeague.png'); // Fallback
 
-    // Construir la ruta completa al archivo y enviarlo
-    const imagePath = path.join(imageDir, imageFile);
     res.sendFile(imagePath);
   } catch (error) {
     next(error);
   }
 };
-
 
 export { createLiga, joinLiga, getUsersByLiga, getLigaCodeById, removeUserFromLiga,
   assignNewCaptain, abandonLiga, uploadLeagueImageByCaptainController, getLeagueImageController };
