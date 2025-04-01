@@ -166,6 +166,39 @@ const regenerateWebToken = async (req: Request, res: Response, next: NextFunctio
   }
 };
 
+const googleWebCallback = async (req: Request, res: Response): Promise<void> => {
+  const user = req.user as UserI | undefined;
+  const jwtSecret = process.env.JWT_SECRET_KEY;
+
+  if (!user?.id || !user.correo || !jwtSecret) {
+    res.redirect('/login');
+    return;
+  }
+
+  const webToken = jwt.sign({ id: user.id, correo: user.correo, isAdmin: user.is_admin }, jwtSecret, { expiresIn: '1h' });
+  const refreshWebToken = jwt.sign({ id: user.id, correo: user.correo, isAdmin: user.is_admin }, jwtSecret, { expiresIn: '7d' });
+
+  await updateUserTokens(user.id, { webToken, refreshWebToken });
+
+  res.redirect(`http://localhost:3000?webToken=${webToken}&refreshWebToken=${refreshWebToken}`);
+};
+
+const googleMobileCallback = async (req: Request, res: Response): Promise<Response | void> => {
+  const user = req.user as UserI | undefined;
+  const jwtSecret = process.env.JWT_SECRET_KEY;
+
+  if (!user?.id || !user.correo || !jwtSecret) {
+    return res.status(401).json({ error: 'Authentication failed' });
+  }
+
+  const mobileToken = jwt.sign({ id: user.id, correo: user.correo, isAdmin: user.is_admin }, jwtSecret, { expiresIn: '365d' });
+
+  await updateUserTokens(user.id, { mobileToken });
+
+  res.json({ mobileToken });
+};
+
+
 
 export {
   registerWeb,
@@ -174,5 +207,8 @@ export {
   loginMobile,
   logoutWeb,
   logoutMobile,
-  regenerateWebToken
+  regenerateWebToken,
+  googleWebCallback,
+  googleMobileCallback
+
 };
