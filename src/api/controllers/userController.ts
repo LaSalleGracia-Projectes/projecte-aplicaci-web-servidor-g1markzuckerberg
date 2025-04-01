@@ -2,6 +2,8 @@ import { type Request, type Response, type NextFunction } from 'express';
 import path from 'path';
 import httpStatus from '../config/httpStatusCodes.js';
 import { updateUsernameService, updateBirthDateService, updatePasswordService, getLeaguesByUserService } from '../../services/userService.js';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 
 /**
  * **Sube la imagen de perfil del usuario y guarda la URL en la base de datos.**
@@ -119,4 +121,33 @@ const getUserLeagues = async (req: Request, res: Response, next: NextFunction) =
   }
 };
 
-export { uploadUserImageController, updateUsernameController, updateBirthDateController, updatePasswordController, getUserLeagues };
+const getUserImageController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Obtenemos el usuario autenticado
+    const user = res.locals.user as { id: number };
+    if (!user?.id) {
+      return res.status(httpStatus.unauthorized).json({ error: 'No autorizado' });
+    }
+    
+    // Definir la ruta al directorio de imágenes de usuarios
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
+    const dir = path.join(__dirname, '../../../public/img/users');
+
+    // Buscar el archivo que empiece con "userImage<user.id>"
+    const files = fs.readdirSync(dir);
+    const imageFile = files.find(fileName => fileName.startsWith(`userImage${user.id}`));
+
+    if (!imageFile) {
+      return res.status(httpStatus.notFound).json({ error: 'Imagen no encontrada.' });
+    }
+
+    const imagePath = path.join(dir, imageFile);
+    res.sendFile(imagePath);
+  } catch (error) {
+    next(error);
+  }
+};
+
+export { uploadUserImageController, updateUsernameController, updateBirthDateController,
+  updatePasswordController, getUserLeagues, getUserImageController };

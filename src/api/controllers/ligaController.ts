@@ -6,6 +6,11 @@ import { createLigaService, findLigaByCodeService, addUserToLigaService,
 import { getCurrentJornada, getJornadaByName } from '../../services/jornadaSupaService.js';
 import type Liga from '../../types/Liga.js';
 import httpStatus from '../config/httpStatusCodes.js';
+import { sql } from '../../services/supabaseService.js';
+import path from 'path';
+import { usuariosLigasTable } from '../../models/LigaUsuario.js';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 
 /**
  * **Crear una nueva liga.**
@@ -219,7 +224,72 @@ const abandonLiga = async (req: Request, res: Response, next: NextFunction) => {
   }
 };
 
+const uploadLeagueImageByCaptainController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { ligaId } = req.params;
+    const user = res.locals.user as { id: number };
 
-export { createLiga, joinLiga, getUsersByLiga, getLigaCodeById, removeUserFromLiga, assignNewCaptain, abandonLiga };
+    if (!user?.id) {
+      return res.status(httpStatus.unauthorized).json({ error: 'No autorizado' });
+    }
+    
+    // Verificar que el usuario sea capitán de la liga
+    const [captainRecord] = await sql`
+      SELECT is_capitan FROM ${sql(usuariosLigasTable)}
+      WHERE usuario_id = ${user.id} AND liga_id = ${ligaId}
+      LIMIT 1;
+    `;
+    
+    if (!captainRecord?.is_capitan) {
+      return res.status(httpStatus.badRequest).json({ error: 'Solo el capitán puede actualizar la imagen de la liga' });
+    }
+    
+    if (!req.file) {
+      return res.status(httpStatus.badRequest).json({ error: 'No se ha subido ninguna imagen.' });
+    }
+    
+    // Construir la URL relativa de la imagen
+    const imageUrl = `/img/ligas/leagueImage${ligaId}${path.extname(req.file.originalname)}`;
+    
+    res.status(httpStatus.ok).json({
+      message: 'Imagen de liga actualizada correctamente.',
+      imageUrl
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getLeagueImageController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { ligaId } = req.params;
+    if (!ligaId) {
+      return res.status(400).json({ error: 'No se proporcionó el ID de la liga.' });
+    }
+
+    // Obtener la ruta del directorio de imágenes de ligas
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
+    const imageDir = path.join(__dirname, '../../../public/img/ligas');
+
+    // Listar los archivos del directorio y buscar el que corresponde a la liga
+    const files = fs.readdirSync(imageDir);
+    const imageFile = files.find(fileName => fileName.startsWith(`leagueImage${ligaId}`));
+
+    if (!imageFile) {
+      return res.status(404).json({ error: 'Imagen no encontrada.' });
+    }
+
+    // Construir la ruta completa al archivo y enviarlo
+    const imagePath = path.join(imageDir, imageFile);
+    res.sendFile(imagePath);
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+export { createLiga, joinLiga, getUsersByLiga, getLigaCodeById, removeUserFromLiga,
+  assignNewCaptain, abandonLiga, uploadLeagueImageByCaptainController, getLeagueImageController };
 
 
