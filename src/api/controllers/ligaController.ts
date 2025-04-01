@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { type Request, type Response, type NextFunction } from 'express';
-import { createLigaService, findLigaByCodeService, addUserToLigaService, getUsersByLigaService, isUserInLigaService, getLigaCodeByIdService } from '../../services/ligaSupaService.js';
+import { createLigaService, findLigaByCodeService, addUserToLigaService, getUsersByLigaService, isUserInLigaService, getLigaCodeByIdService, removeUserFromLigaService } from '../../services/ligaSupaService.js';
 import { getCurrentJornada, getJornadaByName } from '../../services/jornadaSupaService.js';
 import type Liga from '../../types/Liga.js';
 import httpStatus from '../config/httpStatusCodes.js';
@@ -161,8 +161,38 @@ const getLigaCodeById = async (req: Request, res: Response, next: NextFunction) 
   }
 };
 
+/**
+ * Controlador para eliminar a un usuario de una liga.
+ * Solo puede hacerlo el capitán de la liga.
+ *
+ * Ruta: DELETE /api/v1/ligas/:ligaId/user/:userId
+ */
+const removeUserFromLiga = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // El ID del usuario que realiza la acción (capitán) se obtiene desde res.locals.
+    const capitan = res.locals.user as { id: number };
+    if (!capitan?.id) {
+      return res.status(httpStatus.unauthorized).send({ error: 'No autorizado' });
+    }
+
+    // Extraer los parámetros: ligaId y userId (del usuario a eliminar).
+    const { ligaId, userId } = req.params;
+    const leagueId = Number(ligaId);
+    const userIdToRemove = Number(userId);
+    if (isNaN(leagueId) || isNaN(userIdToRemove)) {
+      return res.status(httpStatus.badRequest).send({ error: 'IDs inválidos' });
+    }
+
+    // Llamar al servicio para eliminar el usuario de la liga.
+    await removeUserFromLigaService(capitan.id, leagueId, userIdToRemove);
+
+    res.status(httpStatus.ok).send({ message: 'Usuario eliminado de la liga correctamente' });
+  } catch (error) {
+    next(error);
+  }
+};
 
 
-export { createLiga, joinLiga, getUsersByLiga, getLigaCodeById };
+export { createLiga, joinLiga, getUsersByLiga, getLigaCodeById, removeUserFromLiga };
 
 

@@ -199,5 +199,54 @@ const getLigaCodeByIdService = async (ligaId: number, userId: number): Promise<s
   return liga.code;
 };
 
+/**
+ * Eliminar un usuario de una liga.
+ * Solo puede hacerlo el capitán de la liga.
+ *
+ * @param capitanId - ID del usuario que realiza la acción (capitán), obtenido desde res.locals.
+ * @param ligaId - ID de la liga.
+ * @param userIdToRemove - ID del usuario a eliminar.
+ * @returns {Promise<boolean>} - Retorna true si se eliminó correctamente.
+ */
+const removeUserFromLigaService = async (
+  capitanId: number,
+  ligaId: number,
+  userIdToRemove: number
+): Promise<boolean> => {
+  // Verificar que el usuario que realiza la acción es capitán en la liga.
+  const [captainRecord] = await sql`
+    SELECT is_capitan FROM ${sql(usuariosLigasTable)}
+    WHERE usuario_id = ${capitanId} AND liga_id = ${ligaId}
+    LIMIT 1;
+  `;
+  if (!captainRecord?.is_capitan) {
+    throw new Error('No eres el capitán de la liga');
+  }
 
-export { createLigaService, findLigaByCodeService, addUserToLigaService, getUsersByLigaService, isUserInLigaService, getLigaCodeByIdService };
+  // Opcional: Prevenir que el capitán se elimine a sí mismo.
+  if (capitanId === userIdToRemove) {
+    throw new Error('El capitán no puede eliminarse a sí mismo');
+  }
+
+  // Verificar que el usuario a eliminar está en la liga.
+  const [userRecord] = await sql`
+    SELECT 1 FROM ${sql(usuariosLigasTable)}
+    WHERE usuario_id = ${userIdToRemove} AND liga_id = ${ligaId}
+    LIMIT 1;
+  `;
+  if (!userRecord) {
+    throw new Error('El usuario a eliminar no está en la liga');
+  }
+
+  // Eliminar la relación del usuario en la liga.
+  await sql`
+    DELETE FROM ${sql(usuariosLigasTable)}
+    WHERE usuario_id = ${userIdToRemove} AND liga_id = ${ligaId};
+  `;
+
+  return true;
+};
+
+
+
+export { createLigaService, findLigaByCodeService, addUserToLigaService, getUsersByLigaService, isUserInLigaService, getLigaCodeByIdService, removeUserFromLigaService };
