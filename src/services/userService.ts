@@ -2,6 +2,9 @@ import { sql } from './supabaseService.js';
 import type UserI from '../types/UserI.js';
 import { userTable } from '../models/User.js';
 import bcrypt from 'bcrypt';
+import type Liga from '../types/Liga.js';
+import { ligaTable } from '../models/Liga.js';
+import { usuariosLigasTable } from '../models/LigaUsuario.js';
 
 /**
  * Buscar usuario por correo
@@ -271,8 +274,40 @@ const adminUpdateUserService = async (adminId: number, userId: number, updates: 
   }
 };
 
-
+/**
+ * Obtener todas las ligas en las que está inscrito un usuario.
+ * @param userId - ID del usuario.
+ * @returns {Promise<Liga[]>} - Array de ligas.
+ */
+/**
+ * Obtener todas las ligas en las que está inscrito un usuario,
+ * incluyendo todos los datos de la liga y el campo `puntos_totales` de la tabla de relación.
+ * @param userId - ID del usuario autenticado.
+ * @returns {Promise<(Liga & { puntos_totales: number })[]>} - Array de ligas con puntos.
+ */
+const getLeaguesByUserService = async (userId: number): Promise<Array<Liga & { puntos_totales: number }>> => {
+  try {
+    const leagues = await sql<Array<Liga & { puntos_totales: number }>>`
+      SELECT 
+        l.id,
+        l.name,
+        l.jornada_id,
+        l.created_by,
+        l.created_jornada,
+        l.code,
+        ul.puntos_totales
+      FROM ${sql(ligaTable)} l
+      JOIN ${sql(usuariosLigasTable)} ul ON l.id = ul.liga_id
+      WHERE ul.usuario_id = ${userId}
+      ORDER BY l.id;
+    `;
+    return leagues;
+  } catch (error) {
+    console.error('❌ Error fetching leagues for user:', error);
+    throw new Error('Database error while fetching leagues for user');
+  }
+};
 
 export { getUserService, getUserByIdService, createUserService, findUserByEmail,
   deleteUserByEmail, updateUserTokens, updateBirthDateService, updateUsernameService,
-  updatePasswordService, adminUpdateUserService, getUserByIdAdminService };
+  updatePasswordService, adminUpdateUserService, getUserByIdAdminService, getLeaguesByUserService };

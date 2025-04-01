@@ -157,7 +157,47 @@ const isUserInLigaService = async (usuarioId: number, ligaId: number): Promise<b
   }
 };
 
+/**
+ * Buscar liga por id.
+ */
+const findLigaByIdService = async (id: number): Promise<Liga | undefined> => {
+  try {
+    const [liga] = await sql<Liga[]>`
+      SELECT id, name, jornada_id, created_by, created_jornada, code
+      FROM ${sql(ligaTable)}
+      WHERE id = ${id}
+      LIMIT 1
+    `;
+    return liga ?? null;
+  } catch (error) {
+    console.error(`❌ Error fetching league by id:`, error);
+    throw new Error(`Database error while fetching league`);
+  }
+};
+
+/**
+ * Obtener el código de una liga por id.
+ * Solo devuelve el código si el usuario autenticado es miembro de la liga.
+ *
+ * @param ligaId - Id de la liga.
+ * @param userId - Id del usuario autenticado.
+ * @returns {Promise<string>} - El código de la liga.
+ */
+const getLigaCodeByIdService = async (ligaId: number, userId: number): Promise<string> => {
+  // Buscar la liga por id.
+  const liga = await findLigaByIdService(ligaId);
+  if (!liga) {
+    throw new Error('Liga no encontrada');
+  }
+  
+  // Verificar si el usuario es miembro de la liga.
+  const isMember = await isUserInLigaService(userId, liga.id);
+  if (!isMember) {
+    throw new Error('No estás unido a esta liga');
+  }
+  
+  return liga.code;
+};
 
 
-
-export { createLigaService, findLigaByCodeService, addUserToLigaService, getUsersByLigaService, isUserInLigaService };
+export { createLigaService, findLigaByCodeService, addUserToLigaService, getUsersByLigaService, isUserInLigaService, getLigaCodeByIdService };

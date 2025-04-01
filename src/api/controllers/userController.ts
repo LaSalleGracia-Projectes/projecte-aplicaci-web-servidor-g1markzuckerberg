@@ -1,7 +1,7 @@
 import { type Request, type Response, type NextFunction } from 'express';
 import path from 'path';
 import httpStatus from '../config/httpStatusCodes.js';
-import { updateUsernameService, updateBirthDateService, updatePasswordService } from '../../services/userService.js';
+import { updateUsernameService, updateBirthDateService, updatePasswordService, getLeaguesByUserService } from '../../services/userService.js';
 
 /**
  * **Sube la imagen de perfil del usuario y guarda la URL en la base de datos.**
@@ -98,4 +98,25 @@ const updatePasswordController = async (req: Request, res: Response, next: NextF
   }
 };
 
-export { uploadUserImageController, updateUsernameController, updateBirthDateController, updatePasswordController };
+/**
+ * Controlador para obtener todas las ligas en las que el usuario autenticado está inscrito,
+ * incluyendo los datos de la liga y `puntos_totales`.
+ * Ruta: GET /api/v1/users/leagues
+ */
+const getUserLeagues = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Obtenemos el usuario autenticado (por ejemplo, a partir del token, que se asigna en res.locals.user)
+    const user = res.locals.user as { id: number };
+    if (!user?.id) {
+      return res.status(httpStatus.unauthorized).send({ error: 'No autorizado' });
+    }
+
+    // Obtenemos las ligas del usuario, incluyendo puntos_totales
+    const leagues = await getLeaguesByUserService(user.id);
+    return res.status(httpStatus.ok).json({ leagues });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export { uploadUserImageController, updateUsernameController, updateBirthDateController, updatePasswordController, getUserLeagues };

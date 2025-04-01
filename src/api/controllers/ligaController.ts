@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { type Request, type Response, type NextFunction } from 'express';
-import { createLigaService, findLigaByCodeService, addUserToLigaService, getUsersByLigaService, isUserInLigaService } from '../../services/ligaSupaService.js';
+import { createLigaService, findLigaByCodeService, addUserToLigaService, getUsersByLigaService, isUserInLigaService, getLigaCodeByIdService } from '../../services/ligaSupaService.js';
 import { getCurrentJornada, getJornadaByName } from '../../services/jornadaSupaService.js';
 import type Liga from '../../types/Liga.js';
 import httpStatus from '../config/httpStatusCodes.js';
@@ -130,8 +130,39 @@ const getUsersByLiga = async (req: Request, res: Response, next: NextFunction) =
   }
 };
 
+/**
+ * Controlador para obtener el código de la liga por id.
+ * Solo se devuelve si el usuario autenticado es miembro de la liga.
+ *
+ * Ruta: GET /api/v1/ligas/code/:ligaId
+ */
+const getLigaCodeById = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Verificar que el usuario esté autenticado.
+    const user = res.locals.user as { id: number };
+    if (!user?.id) {
+      return res.status(httpStatus.unauthorized).send({ error: 'No autorizado' });
+    }
+    
+    // Extraer el id de la liga desde los parámetros.
+    const { ligaId } = req.params;
+    const id = Number(ligaId);
+    if (isNaN(id)) {
+      return res.status(httpStatus.badRequest).send({ error: 'Id de liga inválido' });
+    }
+    
+    // Llamar al servicio para obtener el código de la liga.
+    const code = await getLigaCodeByIdService(id, user.id);
+    
+    // Devolver el código.
+    res.status(httpStatus.ok).send({ code });
+  } catch (error) {
+    next(error);
+  }
+};
 
 
-export { createLiga, joinLiga, getUsersByLiga };
+
+export { createLiga, joinLiga, getUsersByLiga, getLigaCodeById };
 
 
