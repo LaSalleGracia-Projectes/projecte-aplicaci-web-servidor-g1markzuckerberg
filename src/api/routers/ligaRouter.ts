@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createLiga, joinLiga, getUsersByLiga, getLigaCodeById, removeUserFromLiga } from '../controllers/ligaController.js';
+import { createLiga, joinLiga, getUsersByLiga, getLigaCodeById, removeUserFromLiga, assignNewCaptain, abandonLiga } from '../controllers/ligaController.js';
 import authMiddleware from '../middlewares/authMiddleware.js';
 
 const ligaRouter = Router();
@@ -10,5 +10,8 @@ ligaRouter.post('/join/:ligaCode', authMiddleware, joinLiga); // Ahora se requie
 ligaRouter.get('/users/:ligaCode', authMiddleware, getUsersByLiga);
 ligaRouter.get('/code/:ligaId', authMiddleware, getLigaCodeById);
 ligaRouter.delete('/kickUser/:ligaId/:userId', authMiddleware, removeUserFromLiga);
+
+ligaRouter.put('/make-captain/:ligaId/:newCaptainId', authMiddleware, assignNewCaptain);
+ligaRouter.delete('/leave/:ligaId', authMiddleware, abandonLiga);
 
 export default ligaRouter;

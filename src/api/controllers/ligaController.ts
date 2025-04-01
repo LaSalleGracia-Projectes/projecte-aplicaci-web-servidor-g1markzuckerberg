@@ -1,6 +1,8 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { type Request, type Response, type NextFunction } from 'express';
-import { createLigaService, findLigaByCodeService, addUserToLigaService, getUsersByLigaService, isUserInLigaService, getLigaCodeByIdService, removeUserFromLigaService } from '../../services/ligaSupaService.js';
+import { createLigaService, findLigaByCodeService, addUserToLigaService,
+  getUsersByLigaService, isUserInLigaService, getLigaCodeByIdService, removeUserFromLigaService,
+  assignNewCaptainService, abandonLigaService } from '../../services/ligaSupaService.js';
 import { getCurrentJornada, getJornadaByName } from '../../services/jornadaSupaService.js';
 import type Liga from '../../types/Liga.js';
 import httpStatus from '../config/httpStatusCodes.js';
@@ -192,7 +194,32 @@ const removeUserFromLiga = async (req: Request, res: Response, next: NextFunctio
   }
 };
 
+const assignNewCaptain = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Obtenemos el usuario autenticado desde res.locals.
+    const user = res.locals.user as { id: number };
+    const { ligaId, newCaptainId } = req.params; // Ahora ambos vienen en la URL
 
-export { createLiga, joinLiga, getUsersByLiga, getLigaCodeById, removeUserFromLiga };
+    await assignNewCaptainService(user.id, Number(ligaId), Number(newCaptainId));
+    res.status(200).json({ message: 'Nuevo capitán asignado correctamente' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const abandonLiga = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = res.locals.user as { id: number };
+    const { ligaId } = req.params;
+
+    await abandonLigaService(user.id, Number(ligaId));
+    res.status(200).json({ message: 'Has abandonado la liga correctamente' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+export { createLiga, joinLiga, getUsersByLiga, getLigaCodeById, removeUserFromLiga, assignNewCaptain, abandonLiga };
 
 

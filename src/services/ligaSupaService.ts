@@ -247,6 +247,77 @@ const removeUserFromLigaService = async (
   return true;
 };
 
+/**
+ * Asigna a otro usuario como capitán en una liga.
+ * Solo puede hacerlo el actual capitán.
+ *
+ * @param currentUserId - ID del usuario actual (desde res.locals).
+ * @param ligaId - ID de la liga.
+ * @param newCaptainId - ID del nuevo capitán.
+ */
+const assignNewCaptainService = async (
+  currentUserId: number,
+  ligaId: number,
+  newCaptainId: number
+): Promise<void> => {
+  // Verificar que el usuario actual es capitán en la liga.
+  const [current] = await sql`
+    SELECT is_capitan FROM ${sql(usuariosLigasTable)}
+    WHERE usuario_id = ${currentUserId} AND liga_id = ${ligaId}
+    LIMIT 1;
+  `;
+  if (!current?.is_capitan) {
+    throw new Error('No eres el capitán de esta liga');
+  }
 
+  if (currentUserId === newCaptainId) {
+    throw new Error('No puedes hacerte capitán a ti mismo');
+  }
 
-export { createLigaService, findLigaByCodeService, addUserToLigaService, getUsersByLigaService, isUserInLigaService, getLigaCodeByIdService, removeUserFromLigaService };
+  // Verificar que el nuevo capitán pertenezca a la liga.
+  const [newCap] = await sql`
+    SELECT 1 FROM ${sql(usuariosLigasTable)}
+    WHERE usuario_id = ${newCaptainId} AND liga_id = ${ligaId}
+    LIMIT 1;
+  `;
+  if (!newCap) {
+    throw new Error('El nuevo capitán no pertenece a esta liga');
+  }
+
+  // Actualizar la tabla: quitar la capitanía al actual y asignarla al nuevo.
+  await sql`
+    UPDATE ${sql(usuariosLigasTable)}
+    SET is_capitan = CASE 
+      WHEN usuario_id = ${newCaptainId} THEN TRUE
+      WHEN usuario_id = ${currentUserId} THEN FALSE
+      ELSE is_capitan END
+    WHERE liga_id = ${ligaId} AND usuario_id IN (${currentUserId}, ${newCaptainId});
+  `;
+};
+
+/**
+ * Permite al usuario actual abandonar una liga.
+ * No puede hacerlo si es capitán.
+ *
+ * @param userId - ID del usuario actual (desde res.locals).
+ * @param ligaId - ID de la liga.
+ */
+const abandonLigaService = async (userId: number, ligaId: number): Promise<void> => {
+  const [record] = await sql`
+    SELECT is_capitan FROM ${sql(usuariosLigasTable)}
+    WHERE usuario_id = ${userId} AND liga_id = ${ligaId}
+    LIMIT 1;
+  `;
+  
+  if (!record) throw new Error('No estás en esta liga');
+  if (record.is_capitan) throw new Error('El capitán no puede abandonar la liga');
+
+  await sql`
+    DELETE FROM ${sql(usuariosLigasTable)}
+    WHERE usuario_id = ${userId} AND liga_id = ${ligaId};
+  `;
+};
+
+export { createLigaService, findLigaByCodeService, addUserToLigaService, getUsersByLigaService,
+  isUserInLigaService, getLigaCodeByIdService, removeUserFromLigaService, assignNewCaptainService,
+  abandonLigaService };
