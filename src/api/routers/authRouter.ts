@@ -30,7 +30,7 @@ authRouter.get('/google/web', safePassportAuth('google', { scope: ['profile', 'e
 authRouter.get('/google/web/callback', safePassportAuth('google', { failureRedirect: '/login' }), googleWebCallback);
 
 // 📱 Google OAuth - Mobile
-authRouter.get('/google/mobile', safePassportAuth('google', { scope: ['profile', 'email'] }));
-authRouter.get('/google/mobile/callback', safePassportAuth('google', { failureRedirect: '/login' }), googleMobileCallback);
+authRouter.get('/google/mobile', safePassportAuth('google-mobile', { scope: ['profile', 'email'] }));
+authRouter.get('/google/mobile/callback', safePassportAuth('google-mobile', { failureRedirect: '/login' }), googleMobileCallback);
 
 export default authRouter;

@@ -199,7 +199,6 @@ const googleMobileCallback = async (req: Request, res: Response): Promise<Respon
 };
 
 
-
 export {
   registerWeb,
   registerMobile,
