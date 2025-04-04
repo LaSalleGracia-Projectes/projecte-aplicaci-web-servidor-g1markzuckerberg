@@ -5,6 +5,8 @@ import { createMongoConnection, createPostgresConnection } from './config/db.js'
 import apiRouter from './api/index.js';
 import 'dotenv/config.js';
 import { startJornadaCronJob } from './api/controllers/jornadaCronCrontoller.js';
+import passport from 'passport';
+import './config/passport.js'; // Asegúrate de que la ruta sea correcta
 
 // Inicializar Express
 const app: Express = express();
@@ -28,6 +30,8 @@ const startServer = async () => {
       res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
       next();
     });
+
+    app.use(passport.initialize());
 
     // Rutas de la API
     app.use('/api/v1', apiRouter);
