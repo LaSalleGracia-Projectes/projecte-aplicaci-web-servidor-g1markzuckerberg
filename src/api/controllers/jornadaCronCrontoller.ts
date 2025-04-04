@@ -182,7 +182,7 @@ const startJornadaCronJob = () => {
     void updateJornadasTeamsPlayers();
   });
 
-  cron.schedule('0 */5 * * *', () => {
+  cron.schedule('*/45 * * * * *', () => {
     console.log('🔄 Cron job de actualización de puntos fantasy iniciado cada 5h...');
     void executeFantasyPointsJob();
   });

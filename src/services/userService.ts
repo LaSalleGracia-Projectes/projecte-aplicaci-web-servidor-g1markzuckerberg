@@ -383,7 +383,23 @@ const forgotPasswordService = async (correo: string): Promise<string> => {
   }
 };
 
+const updateGoogleIdService = async (id: number, googleId: string): Promise<boolean> => {
+  try {
+    const result = await sql`
+      UPDATE ${sql(userTable)}
+      SET google_id = ${googleId}
+      WHERE id = ${id}
+      RETURNING id;
+    `;
+
+    return result.length > 0;
+  } catch (error) {
+    console.error(`❌ Error actualizando google_id:`, error);
+    throw new Error(`Database error while updating google_id`);
+  }
+};
+
 export { getUserService, getUserByIdService, createUserService, findUserByEmail,
   deleteUserByEmail, updateUserTokens, updateBirthDateService, updateUsernameService,
   updatePasswordService, adminUpdateUserService, getUserByIdAdminService, getLeaguesByUserService,
-  forgotPasswordService };
+  forgotPasswordService, updateGoogleIdService };
