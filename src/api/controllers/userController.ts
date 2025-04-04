@@ -1,7 +1,11 @@
 import { type Request, type Response, type NextFunction } from 'express';
 import path from 'path';
 import httpStatus from '../config/httpStatusCodes.js';
-import { updateUsernameService, updateBirthDateService, updatePasswordService } from '../../services/userService.js';
+import { updateUsernameService, updateBirthDateService, updatePasswordService, getLeaguesByUserService,
+  forgotPasswordService
+} from '../../services/userService.js';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
 
 /**
  * **Sube la imagen de perfil del usuario y guarda la URL en la base de datos.**
@@ -98,4 +102,65 @@ const updatePasswordController = async (req: Request, res: Response, next: NextF
   }
 };
 
-export { uploadUserImageController, updateUsernameController, updateBirthDateController, updatePasswordController };
+/**
+ * Controlador para obtener todas las ligas en las que el usuario autenticado está inscrito,
+ * incluyendo los datos de la liga y `puntos_totales`.
+ * Ruta: GET /api/v1/users/leagues
+ */
+const getUserLeagues = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Obtenemos el usuario autenticado (por ejemplo, a partir del token, que se asigna en res.locals.user)
+    const user = res.locals.user as { id: number };
+    if (!user?.id) {
+      return res.status(httpStatus.unauthorized).send({ error: 'No autorizado' });
+    }
+
+    // Obtenemos las ligas del usuario, incluyendo puntos_totales
+    const leagues = await getLeaguesByUserService(user.id);
+    return res.status(httpStatus.ok).json({ leagues });
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getUserImageController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const user = res.locals.user as { id: number };
+    if (!user?.id) {
+      return res.status(httpStatus.unauthorized).json({ error: 'No autorizado' });
+    }
+
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
+    const dir = path.join(__dirname, '../../../public/img/users');
+
+    const files = fs.readdirSync(dir);
+    const imageFile = files.find(fileName => fileName.startsWith(`userImage${user.id}`));
+
+    const imagePath = imageFile
+      ? path.join(dir, imageFile)
+      : path.join(dir, 'defaultUser.png'); // Fallback
+
+    res.sendFile(imagePath);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const forgotPasswordController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { correo } = req.body as { correo: string };
+    if (!correo) {
+      return res.status(httpStatus.badRequest).json({ error: 'El correo es obligatorio' });
+    }
+
+    await forgotPasswordService(correo);
+    res.status(httpStatus.ok).json({ message: 'Nueva contraseña enviada al correo' });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+export { uploadUserImageController, updateUsernameController, updateBirthDateController,
+  updatePasswordController, getUserLeagues, getUserImageController, forgotPasswordController };

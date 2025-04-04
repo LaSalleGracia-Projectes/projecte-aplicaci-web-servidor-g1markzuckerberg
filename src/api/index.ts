@@ -5,6 +5,8 @@ import userRouter from './routers/userRouter.js';
 import ligaRouter from './routers/ligaRouter.js';
 import adminRouter from './routers/adminRouter.js';
 import partidoRouter from './routers/partidoRouter.js';
+import jornadaJugadorRouter from './routers/jornadaJugadorRouter.js';
+
 const apiRouter = Router();
 
 // Per obtenir el body en format json
@@ -22,4 +24,5 @@ apiRouter.use('/user', userRouter);
 
 apiRouter.use('/partidos', partidoRouter);
 
+apiRouter.use('/jornadaJugador', jornadaJugadorRouter);
 export default apiRouter;

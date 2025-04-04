@@ -5,6 +5,8 @@ import { createMongoConnection, createPostgresConnection } from './config/db.js'
 import apiRouter from './api/index.js';
 import 'dotenv/config.js';
 import { startJornadaCronJob } from './api/controllers/jornadaCronCrontoller.js';
+import passport from 'passport';
+import './config/passport.js'; // Asegúrate de que la ruta sea correcta
 
 // Inicializar Express
 const app: Express = express();
@@ -29,13 +31,15 @@ const startServer = async () => {
       next();
     });
 
+    app.use(passport.initialize());
+
     // Rutas de la API
     app.use('/api/v1', apiRouter);
 
     // Iniciar servidor
     app.listen(port, () => {
       console.log(`⚡️[server]: Server is running at http://localhost:${port}`);
-      startJornadaCronJob();
+      // AstartJornadaCronJob();
     });
 
     // Exportar la conexión de Supabase
