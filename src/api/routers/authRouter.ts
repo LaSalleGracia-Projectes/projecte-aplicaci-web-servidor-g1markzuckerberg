@@ -4,7 +4,7 @@ import passport from 'passport';
 import jwt from 'jsonwebtoken';
 import {
   registerWeb, registerMobile, loginWeb, loginMobile,
-  logoutWeb, logoutMobile, regenerateWebToken, googleWebCallback, googleMobileCallback
+  logoutWeb, logoutMobile, regenerateWebToken, googleWebCallback, googleMobileCallBack
 } from '../controllers/authController.js';
 import { loginSchema, registerSchema } from '../models/Joi/authSchemas.js';
 import validate from '../middlewares/joiValidation.js';
@@ -31,6 +31,7 @@ authRouter.get('/google/web/callback', safePassportAuth('google', { failureRedir
 
 // 📱 Google OAuth - Mobile
 authRouter.get('/google/mobile', safePassportAuth('google-mobile', { scope: ['profile', 'email'] }));
-authRouter.get('/google/mobile/callback', safePassportAuth('google-mobile', { failureRedirect: '/login' }), googleMobileCallback);
+authRouter.get('/google/mobile/callback', safePassportAuth('google-mobile', { failureRedirect: '/login' }), googleMobileCallBack);
+authRouter.post('/google/mobile/token', googleMobileCallBack);
 
 export default authRouter;
