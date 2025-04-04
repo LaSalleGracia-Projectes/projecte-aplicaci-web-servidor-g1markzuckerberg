@@ -1,5 +1,5 @@
 import { type Request, type Response, type NextFunction } from 'express';
-import { findUserByEmail, createUserService, updateUserTokens } from '../../services/userService.js';
+import { findUserByEmail, createUserService, updateUserTokens, updateGoogleIdService } from '../../services/userService.js';
 import type UserI from '../../types/UserI.js';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
@@ -220,6 +220,13 @@ const googleMobileCallBack = async (req: Request, res: Response): Promise<Respon
 
     if (user) {
       console.log('[BACKEND] Usuario existente encontrado.');
+
+      if (!user.google_id && googleId) {
+        console.log('[BACKEND] Actualizando google_id para usuario existente...');
+        await updateGoogleIdService(user.id!, googleId);
+        user.google_id = googleId;
+      }
+
     } else {
       console.log('[BACKEND] Usuario no existe, creando nuevo...');
       const newUser: UserI = {
@@ -247,10 +254,11 @@ const googleMobileCallBack = async (req: Request, res: Response): Promise<Respon
     await updateUserTokens(user.id!, { mobileToken });
 
     console.log('[BACKEND] ✅ Login completado con éxito para:', correo);
-    res.json({ mobileToken });
+    return res.json({ mobileToken });
+
   } catch (error) {
     console.error('[BACKEND] ❌ Error verificando idToken de Google:', error);
-    res.status(401).json({ error: 'Token inválido' });
+    return res.status(401).json({ error: 'Token inválido' });
   }
 };
 
