@@ -161,6 +161,5 @@ const forgotPasswordController = async (req: Request, res: Response, next: NextF
   }
 };
 
-
 export { uploadUserImageController, updateUsernameController, updateBirthDateController,
   updatePasswordController, getUserLeagues, getUserImageController, forgotPasswordController };
