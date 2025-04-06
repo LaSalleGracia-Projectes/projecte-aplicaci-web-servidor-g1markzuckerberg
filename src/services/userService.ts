@@ -399,7 +399,25 @@ const updateGoogleIdService = async (id: number, googleId: string): Promise<bool
   }
 };
 
+/**
+ * Obtener todos los usuarios.
+ * Nota: la paginación se manejará desde el frontend.
+ */
+const getAllUsersService = async (): Promise<UserI[]> => {
+  try {
+    const users = await sql<UserI[]>`
+      SELECT id, username, correo, is_admin, created_at, "birthDate"
+      FROM ${sql(userTable)}
+      ORDER BY id
+    `;
+    return users;
+  } catch (error) {
+    console.error("❌ Error fetching all users:", error);
+    throw new Error("Database error while fetching all users");
+  }
+};
+
 export { getUserService, getUserByIdService, createUserService, findUserByEmail,
   deleteUserByEmail, updateUserTokens, updateBirthDateService, updateUsernameService,
   updatePasswordService, adminUpdateUserService, getUserByIdAdminService, getLeaguesByUserService,
-  forgotPasswordService, updateGoogleIdService };
+  forgotPasswordService, updateGoogleIdService, getAllUsersService };

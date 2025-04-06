@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { createLiga, joinLiga, getUsersByLiga, getLigaCodeById, removeUserFromLiga,
-  assignNewCaptain, abandonLiga, uploadLeagueImageByCaptainController, getLeagueImageController } from '../controllers/ligaController.js';
+  assignNewCaptain, abandonLiga, uploadLeagueImageByCaptainController, getLeagueImageController,
+  getUserFromLeagueController } from '../controllers/ligaController.js';
 import authMiddleware from '../middlewares/authMiddleware.js';
 import validate from '../middlewares/joiValidation.js';
 import { createLigaSchema } from '../models/Joi/ligaSchemas.js';
@@ -33,5 +34,8 @@ ligaRouter.put(
 );
 
 ligaRouter.get('/image/:ligaId', getLeagueImageController);
+
+// Ejemplo de URL: /api/v1/ligas/123/user/456
+ligaRouter.get('/:leagueId/user/:userId', authMiddleware, getUserFromLeagueController);
 
 export default ligaRouter;
