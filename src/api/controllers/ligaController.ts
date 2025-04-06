@@ -2,7 +2,7 @@
 import { type Request, type Response, type NextFunction } from 'express';
 import { createLigaService, findLigaByCodeService, addUserToLigaService,
   getUsersByLigaService, isUserInLigaService, getLigaCodeByIdService, removeUserFromLigaService,
-  assignNewCaptainService, abandonLigaService } from '../../services/ligaSupaService.js';
+  assignNewCaptainService, abandonLigaService, getUserFromLeagueByIdService } from '../../services/ligaSupaService.js';
 import { getCurrentJornada, getJornadaByName } from '../../services/jornadaSupaService.js';
 import type Liga from '../../types/Liga.js';
 import httpStatus from '../config/httpStatusCodes.js';
@@ -292,7 +292,43 @@ const getLeagueImageController = async (req: Request, res: Response, next: NextF
   }
 };
 
+/**
+ * Controlador para obtener la información de un usuario dentro de una liga.
+ * Se espera que en la URL se envíen:
+ *   - leagueId: ID de la liga.
+ *   - userId: ID del usuario.
+ *
+ * La respuesta incluye la información del usuario (username, birthDate),
+ * los datos de la relación en la liga (puntos_totales, is_capitan) y
+ * la URL de su imagen de perfil.
+ */
+const getUserFromLeagueController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { leagueId, userId } = req.params;
+    const parsedLeagueId = Number(leagueId);
+    const parsedUserId = Number(userId);
+    
+    if (isNaN(parsedLeagueId) || isNaN(parsedUserId)) {
+      return res.status(httpStatus.badRequest).json({ error: 'ID inválido' });
+    }
+    
+    // Se asume que la autenticación y verificación de membresía se realizan en middleware
+    const userRecord = await getUserFromLeagueByIdService(parsedLeagueId, parsedUserId);
+    
+    // Agregar la URL de la imagen de perfil (ej: /api/v1/user/get-image?userId=<ID>)
+    const userWithImage = {
+      ...userRecord,
+      imageUrl: `/api/v1/user/get-image?userId=${userRecord.id}`
+    };
+    
+    res.status(httpStatus.ok).json({ user: userWithImage });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export { createLiga, joinLiga, getUsersByLiga, getLigaCodeById, removeUserFromLiga,
-  assignNewCaptain, abandonLiga, uploadLeagueImageByCaptainController, getLeagueImageController };
+  assignNewCaptain, abandonLiga, uploadLeagueImageByCaptainController, getLeagueImageController,
+  getUserFromLeagueController };
 
 
