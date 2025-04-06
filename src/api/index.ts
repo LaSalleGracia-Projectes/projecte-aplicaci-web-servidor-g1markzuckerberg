@@ -6,6 +6,7 @@ import ligaRouter from './routers/ligaRouter.js';
 import adminRouter from './routers/adminRouter.js';
 import partidoRouter from './routers/partidoRouter.js';
 import jornadaJugadorRouter from './routers/jornadaJugadorRouter.js';
+import playerRouter from './routers/playerRouter.js';
 
 const apiRouter = Router();
 
@@ -25,4 +26,7 @@ apiRouter.use('/user', userRouter);
 apiRouter.use('/partidos', partidoRouter);
 
 apiRouter.use('/jornadaJugador', jornadaJugadorRouter);
+
+apiRouter.use('/player', playerRouter);
+
 export default apiRouter;
