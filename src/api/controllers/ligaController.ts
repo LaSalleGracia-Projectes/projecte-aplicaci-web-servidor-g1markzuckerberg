@@ -110,28 +110,36 @@ const getUsersByLiga = async (req: Request, res: Response, next: NextFunction) =
     const { ligaCode } = req.params;
     const { jornada } = req.query as { jornada?: string };
 
-    // ✅ Verificar autenticación del usuario
+    // Verificar autenticación del usuario
     const user = res.locals.user as { id: number };
     if (!user?.id) {
-      return res.status(httpStatus.unauthorized).send({ error: 'No autorizado' });
+      return res.status(httpStatus.unauthorized).json({ error: 'No autorizado' });
     }
 
-    // ✅ Buscar la liga por código
+    // Buscar la liga por código
     const liga = await findLigaByCodeService(ligaCode);
     if (!liga) {
-      return res.status(httpStatus.notFound).send({ error: 'Liga no encontrada' });
+      return res.status(httpStatus.notFound).json({ error: 'Liga no encontrada' });
     }
 
-    // ✅ Verificar si el usuario está en la liga
+    // Verificar si el usuario está en la liga
     const isUserInLiga = await isUserInLigaService(user.id, liga.id);
     if (!isUserInLiga) {
-      return res.status(httpStatus.unauthorized).send({ error: 'No estás unido a esta liga' });
+      return res.status(httpStatus.unauthorized).json({ error: 'No estás unido a esta liga' });
     }
 
-    // ✅ Llamar al servicio para obtener usuarios de la liga
-    const data = await getUsersByLigaService(ligaCode, jornada);
+    // Obtener usuarios de la liga (según el código y, opcionalmente, la jornada)
+    const result = await getUsersByLigaService(ligaCode, jornada);
+    const userList = result.users as unknown as Array<{ id: number }>;
 
-    res.status(httpStatus.ok).send(data);
+    // Agregar a cada usuario la URL de la imagen de perfil
+    // Se asume que la ruta para obtener la imagen es: /api/v1/user/get-image?userId=<ID>
+    const usersWithImage = userList.map((userRecord) => ({
+      ...userRecord,
+      imageUrl: `/api/v1/user/get-image?userId=${userRecord.id}`
+    }));
+
+    res.status(httpStatus.ok).json(usersWithImage);
   } catch (error) {
     next(error);
   }
