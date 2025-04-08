@@ -130,16 +130,20 @@ const getUsersByLiga = async (req: Request, res: Response, next: NextFunction) =
 
     // Obtener usuarios de la liga (según el código y, opcionalmente, la jornada)
     const result = await getUsersByLigaService(ligaCode, jornada);
-    const userList = result.users as unknown as Array<{ id: number }>;
 
-    // Agregar a cada usuario la URL de la imagen de perfil
-    // Se asume que la ruta para obtener la imagen es: /api/v1/user/get-image?userId=<ID>
-    const usersWithImage = userList.map((userRecord) => ({
+    // Procesar cada registro para agregar la URL de la imagen de perfil
+    const typedUsers = (result.users as unknown) as Array<{ [key: string]: any; id: number }>;
+    const usersWithImage = typedUsers.map((userRecord) => ({
       ...userRecord,
       imageUrl: `/api/v1/user/get-image?userId=${userRecord.id}`
     }));
 
-    res.status(httpStatus.ok).json(usersWithImage);
+    // Retornar la información de la liga, la lista de usuarios con imagen y la jornada consultada
+    res.status(httpStatus.ok).json({
+      liga: result.liga,
+      users: usersWithImage,
+      jornada_id: result.jornada_id
+    });
   } catch (error) {
     next(error);
   }
