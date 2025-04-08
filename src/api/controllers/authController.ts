@@ -1,9 +1,10 @@
 import { type Request, type Response, type NextFunction } from 'express';
-import { findUserByEmail, createUserService, updateUserTokens } from '../../services/userService.js';
+import { findUserByEmail, createUserService, updateUserTokens, updateGoogleIdService } from '../../services/userService.js';
 import type UserI from '../../types/UserI.js';
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import httpStatus from '../config/httpStatusCodes.js';
+import { OAuth2Client } from 'google-auth-library';
 
 // Expiración de tokens
 const webTokenExpiration = '1h';
@@ -166,6 +167,100 @@ const regenerateWebToken = async (req: Request, res: Response, next: NextFunctio
   }
 };
 
+const googleWebCallback = async (req: Request, res: Response): Promise<void> => {
+  const user = req.user as UserI | undefined;
+  const jwtSecret = process.env.JWT_SECRET_KEY;
+
+  if (!user?.id || !user.correo || !jwtSecret) {
+    res.redirect('/login');
+    return;
+  }
+
+  const webToken = jwt.sign({ id: user.id, correo: user.correo, isAdmin: user.is_admin }, jwtSecret, { expiresIn: '1h' });
+  const refreshWebToken = jwt.sign({ id: user.id, correo: user.correo, isAdmin: user.is_admin }, jwtSecret, { expiresIn: '7d' });
+
+  await updateUserTokens(user.id, { webToken, refreshWebToken });
+
+  res.redirect(`http://localhost:3000?webToken=${webToken}&refreshWebToken=${refreshWebToken}`);
+};
+
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+const googleMobileCallBack = async (req: Request, res: Response): Promise<Response | void> => {
+  const { idToken } = req.body as { idToken: string };
+
+  console.log('[BACKEND] Recibido idToken:', (idToken?.slice(0, 20) ?? '') + '...');
+
+  if (!idToken) {
+    console.warn('[BACKEND] ❌ Falta el idToken en la petición');
+    return res.status(400).json({ error: 'Falta el idToken' });
+  }
+
+  try {
+    const ticket = await client.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+
+    const payload = ticket.getPayload();
+    console.log('[BACKEND] Payload del token:', payload);
+
+    if (!payload?.email) {
+      console.warn('[BACKEND] ❌ Token inválido (sin email)');
+      return res.status(401).json({ error: 'Token inválido' });
+    }
+
+    const correo = payload.email;
+    const username = payload.name ?? '';
+    const googleId = payload.sub;
+
+    console.log(`[BACKEND] Usuario identificado: ${correo} (${username})`);
+
+    let user: UserI | undefined = await findUserByEmail(correo);
+
+    if (user) {
+      console.log('[BACKEND] Usuario existente encontrado.');
+
+      if (!user.google_id && googleId) {
+        console.log('[BACKEND] Actualizando google_id para usuario existente...');
+        await updateGoogleIdService(user.id!, googleId);
+        user.google_id = googleId;
+      }
+
+    } else {
+      console.log('[BACKEND] Usuario no existe, creando nuevo...');
+      const newUser: UserI = {
+        correo,
+        username,
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        google_id: googleId
+      };
+      user = await createUserService(newUser);
+    }
+
+    const jwtSecret = process.env.JWT_SECRET_KEY;
+    if (!jwtSecret) {
+      console.error('[BACKEND] ❌ No hay JWT_SECRET_KEY');
+      return res.status(500).json({ error: 'No hay JWT_SECRET_KEY' });
+    }
+
+    const mobileToken = jwt.sign(
+      { id: user.id, correo: user.correo, isAdmin: user.is_admin },
+      jwtSecret,
+      { expiresIn: '365d' }
+    );
+
+    console.log('[BACKEND] Token generado correctamente, actualizando base de datos...');
+    await updateUserTokens(user.id!, { mobileToken });
+
+    console.log('[BACKEND] ✅ Login completado con éxito para:', correo);
+    return res.json({ mobileToken });
+
+  } catch (error) {
+    console.error('[BACKEND] ❌ Error verificando idToken de Google:', error);
+    return res.status(401).json({ error: 'Token inválido' });
+  }
+};
 
 export {
   registerWeb,
@@ -174,5 +269,8 @@ export {
   loginMobile,
   logoutWeb,
   logoutMobile,
-  regenerateWebToken
+  regenerateWebToken,
+  googleWebCallback,
+  googleMobileCallBack
+
 };

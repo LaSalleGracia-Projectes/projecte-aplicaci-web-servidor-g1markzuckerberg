@@ -2,12 +2,15 @@
 /* eslint-disable @typescript-eslint/naming-convention, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-return */
 import axios from 'axios';
 import dotenv from 'dotenv';
-import fs from 'fs';
 import type Fixture from '../types/Fixture';
 import type { RoundData } from '../types/RoundData';
 import type Event from '../types/Event';
 import type LineupPlayer from '../types/LineupPlayer';
 import type FixtureResult from '../types/FixtureResult';
+import type { PlayerData } from '../types/PlayerData';
+import { sql } from './supabaseService.js';
+import { jugadoresTable } from '../models/PlayerSupabase.js';
+import type { Jugador } from '../types/JugadorJornada.js';
 dotenv.config();
 
 const apiToken: string = process.env.API_TOKEN ?? '';
@@ -17,18 +20,6 @@ const POSITION_POR = 24;
 const POSITION_DF = 25;
 const POSITION_MC = 26;
 const POSITION_DL = 27;
-
-/**
- * Interfaz extendida para almacenar la información de cada jugador.
- */
-interface PlayerData {
-  player_name: string;
-  points: number;
-  positionId: number;
-  starter: boolean;
-  team_id: number;
-  played: boolean;
-}
 
 /**
  * Obtiene las alineaciones (lineups) directamente del endpoint.
@@ -129,7 +120,7 @@ const getPointsForStat = ({ type_id, value }: { type_id: number; value: number }
         else points -= 1;
       } else if (positionId === POSITION_MC) {
         if (value >= 90) points += 2;
-        else if (value >= 90) points += 1;
+        else if (value >= 80) points += 1;
       } else if (positionId === POSITION_DF) {
         if (value >= 90) points += 1;
       }
@@ -160,26 +151,26 @@ const getPointsForStat = ({ type_id, value }: { type_id: number; value: number }
 
       break;
 
-      case 46: // Ball Safe (solo POR)
-       if (positionId === POSITION_POR) {
-         if (value >= 10) points += 5;
-         else if (value >= 8) points += 4;
-         else if (value >= 6) points += 3;
-         else if (value >= 4) points += 2;
-         else if (value >= 2) points += 1;
-       }
- 
-       break;
-     // 47, 49, 50, 52, 53, 54, 55 se ignoran
-     case 57: // Saves (solo POR)
-       if (positionId === POSITION_POR) {
-         if (value >= 10) points += 5;
-         else if (value >= 8) points += 4;
-         else if (value >= 6) points += 3;
-         else if (value >= 4) points += 2;
-         else if (value >= 2) points += 1;
-       }
-    
+    case 46: // Ball Safe (solo POR)
+      if (positionId === POSITION_POR) {
+        if (value >= 10) points += 5;
+        else if (value >= 8) points += 4;
+        else if (value >= 6) points += 3;
+        else if (value >= 4) points += 2;
+        else if (value >= 2) points += 1;
+      }
+
+      break;
+    // 47, 49, 50, 52, 53, 54, 55 se ignoran
+    case 57: // Saves (solo POR)
+      if (positionId === POSITION_POR) {
+        if (value >= 10) points += 5;
+        else if (value >= 8) points += 4;
+        else if (value >= 6) points += 3;
+        else if (value >= 4) points += 2;
+        else if (value >= 2) points += 1;
+      }
+
 
       break;
     case 58: // Shots Blocked
@@ -212,7 +203,7 @@ const getPointsForStat = ({ type_id, value }: { type_id: number; value: number }
         else if (value >= 14) points += 1;
       } else if (positionId === POSITION_MC) {
         if (value >= 25) points += 2;
-        else if (value >=20) points += 1;
+        else if (value >= 20) points += 1;
       }
 
       break;
@@ -426,16 +417,18 @@ export const processFixtureFantasyPoints = async (
   const playerMap: Record<number, PlayerData> = {};
   lineups.forEach((player: any) => {
     const name = player.player_name || '';
-    const starterBonus = (player.type_id === 11) ? 3 : 0;
+    const isStarter = player.type_id === 11;
+  
     playerMap[player.player_id] = {
       player_name: name,
-      points: starterBonus,
+      points: isStarter ? 3 : 0,
       positionId: player.position_id || POSITION_MC,
-      starter: player.type_id === 11,
+      starter: isStarter,
       team_id: player.team_id,
-      played: true
+      played: isStarter // Jugó solo si fue titular (suplentes aún no han jugado)
     };
   });
+  
 
   // Procesa los eventos
   events.forEach((event: any) => {
@@ -454,7 +447,7 @@ export const processFixtureFantasyPoints = async (
       }
 
       playerMap[event.player_id].points += 4;
-      console.log('Gol procesado de', playerMap[event.player_id].player_name);
+      // Console.log('Gol procesado de', playerMap[event.player_id].player_name);
       // Al asistente (related_player_id) se le suman +3, si existe
       if (event.related_player_id) {
         if (!playerMap[event.related_player_id]) {
@@ -469,8 +462,8 @@ export const processFixtureFantasyPoints = async (
         }
 
         playerMap[event.related_player_id].points += 3;
-        console.log('Asistencia procesada de', playerMap[event.related_player_id].
-          player_name);
+        // Console.log('Asistencia procesada de', playerMap[event.related_player_id].
+        //  player_name);
       }
     } else {
       // Para otros eventos, se determina el jugador a partir de related_player_id o por nombre
@@ -495,35 +488,80 @@ export const processFixtureFantasyPoints = async (
       }
 
       if (event.type_id === 18) {
-        playerMap[playerId].played = true;
-      } else {
-        const pts = getPointsForEvent(event as Event);
-        playerMap[playerId].points += pts;
+        const enteringPlayerId = event.player_id;
+        if (!playerMap[enteringPlayerId]) {
+          playerMap[enteringPlayerId] = {
+            player_name: event.player_name || '',
+            points: 0,
+            positionId: POSITION_MC,
+            starter: false,
+            team_id: event.participant_id,
+            played: false,
+          };
+        }
+
+        playerMap[enteringPlayerId].played = true;
       }
+      
     }
   });
 
-  // Procesa las estadísticas (la API devuelve un array)
-  // Se asume que fixtureResult.statistics es un array de objetos con: type_id, participant_id y data.value
-  const statsArray = fixtureResult.statistics as Array<{ type_id: number; participant_id: number; data: { value: number } }>;
-  statsArray.forEach((stat) => {
-    Object.values(playerMap).forEach((player) => {
-      // Se suma la estadística si el jugador pertenece al equipo indicado (participant_id)
-      if (player.played && player.team_id === stat.participant_id) {
-        const statPoints = getPointsForStat({ type_id: stat.type_id, value: Number(stat.data.value) }, player.positionId);
-        player.points += statPoints;
-      }
-    });
-  });
+// Procesa las estadísticas acumulando puntos en una propiedad temporal
+const statsArray = fixtureResult.statistics as Array<{ type_id: number; participant_id: number; data: { value: number } }>;
 
-  const results = Object.entries(playerMap).map(([id, data]) => ({
+// Inicializa la propiedad temporal "statPoints" para cada jugador (sin modificar la interfaz final)
+Object.values(playerMap).forEach((player) => {
+  (player as any).statPoints = 0;
+});
+
+// Acumula todos los puntos de estadísticas en "statPoints"
+statsArray.forEach((stat) => {
+  Object.values(playerMap).forEach((player) => {
+    if (player.played && player.team_id === stat.participant_id) {
+      const pointsForThisStat = getPointsForStat(
+        { type_id: stat.type_id, value: Number(stat.data.value) },
+        player.positionId
+      );
+      (player as any).statPoints = Number((player as any).statPoints) + pointsForThisStat;
+    }
+  });
+});
+
+// Suma los puntos acumulados de estadísticas al total final del jugador
+Object.values(playerMap).forEach((player) => {
+  if (player.starter) {
+    // Si es titular, se suman todos los puntos acumulados
+    player.points += Number((player as any).statPoints);
+  } else {
+    // Si es suplente, se suma la mitad de los puntos acumulados, eliminando el decimal
+    player.points += Math.trunc((player as any).statPoints / 2);
+  }
+});
+
+
+  const results = Object.entries(playerMap)
+  // .filter(([_, data]) => data.played) ❌ quitar esta línea
+  .map(([id, data]) => ({
     player_id: Number(id),
     player_name: data.player_name,
-    points: data.points,
+    points: data.played ? data.points : 0, // ✅ Si no jugó, puntos = 0
   }));
 
-  fs.writeFileSync('matchdayFantasyPoints.json', JSON.stringify(results, null, 2), 'utf-8');
-  console.log('Resultados de la jornada guardados en matchdayFantasyPoints.json');
+  const dbPlayers = await getAllDbPlayers();
+
+  const existingIds = new Set(results.map(r => r.player_id));
+
+  dbPlayers.forEach(dbPlayer => {
+    if (!existingIds.has(dbPlayer.id)) {
+      results.push({
+        player_id: dbPlayer.id,
+        player_name: dbPlayer.displayName,
+        points: 0
+      });
+    }
+  });
+
+
   return results;
 };
 
@@ -563,16 +601,31 @@ export const processMatchdayFantasyPoints = async (
 export const getFixturesForRound = async (
   roundId: number
 ): Promise<{ fixtureIds: number[]; matchday: number }> => {
-  const response = await axios.get(`https://api.sportmonks.com/v3/football/rounds/${roundId}`, {
-    params: {
-      api_token: apiToken,
-      include: 'fixtures'
+  try {
+    const response = await axios.get(`https://api.sportmonks.com/v3/football/rounds/${roundId}`, {
+      params: {
+        api_token: apiToken,
+        include: 'fixtures'
+      }
+    });
+
+    const roundData: RoundData | undefined = response.data?.data;
+
+    // Validaciones añadidas aquí:
+    if (!roundData?.fixtures) {
+      console.warn(`⚠️ No se encontraron fixtures para la ronda ${roundId}.`);
+      return { fixtureIds: [], matchday: roundId };
     }
-  });
-  const roundData: RoundData = response.data.data;
-  const fixtureIds = roundData.fixtures.map((fixture: Fixture) => fixture.id);
-  const matchday = parseInt(roundData.name, 10);
-  return { fixtureIds, matchday };
+
+    const fixtureIds = roundData.fixtures.map((fixture: Fixture) => fixture.id);
+    const matchday = parseInt(roundData.name, 10);
+
+    return { fixtureIds, matchday };
+
+  } catch (error: any) {
+    console.error(`❌ Error en la llamada a la API Sportmonks para la ronda ${roundId}:`, error.response?.data ?? error.message);
+    return { fixtureIds: [], matchday: roundId };
+  }
 };
 
 /**
@@ -582,9 +635,23 @@ export const processRoundFantasyPoints = async (
   roundId: number
 ): Promise<Array<{ player_id: number; player_name: string; points: number }>> => {
   const { fixtureIds } = await getFixturesForRound(roundId);
+
   if (fixtureIds.length === 0) {
-    throw new Error(`No se encontraron partidos para la ronda ${roundId}.`);
+    console.warn(`⚠️ No hay partidos disponibles para la ronda ${roundId}.`);
+    return [];
   }
 
   return processMatchdayFantasyPoints(fixtureIds);
 };
+
+export async function getAllDbPlayers(): Promise<Array<Pick<Jugador, 'id' | 'displayName'>>> {
+  try {
+    const jugadores = await sql`
+      SELECT id, "displayName" FROM ${sql(jugadoresTable)}
+    `;
+    return jugadores.map((row: any) => ({ id: row.id, displayName: row.displayName }));
+  } catch (error: any) {
+    console.error("❌ Error al obtener jugadores de la base de datos:", error);
+    throw new Error(`Error leyendo jugadores: ${error.message}`);
+  }
+}

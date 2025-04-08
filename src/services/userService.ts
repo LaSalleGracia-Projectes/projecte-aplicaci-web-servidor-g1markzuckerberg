@@ -2,6 +2,12 @@ import { sql } from './supabaseService.js';
 import type UserI from '../types/UserI.js';
 import { userTable } from '../models/User.js';
 import bcrypt from 'bcrypt';
+import type Liga from '../types/Liga.js';
+import { ligaTable } from '../models/Liga.js';
+import { usuariosLigasTable } from '../models/LigaUsuario.js';
+import nodemailer from 'nodemailer';
+import type { Transporter } from 'nodemailer';
+
 
 /**
  * Buscar usuario por correo
@@ -271,8 +277,169 @@ const adminUpdateUserService = async (adminId: number, userId: number, updates: 
   }
 };
 
+/**
+ * Obtener todas las ligas en las que está inscrito un usuario.
+ * @param userId - ID del usuario.
+ * @returns {Promise<Liga[]>} - Array de ligas.
+ */
+/**
+ * Obtener todas las ligas en las que está inscrito un usuario,
+ * incluyendo todos los datos de la liga y el campo `puntos_totales` de la tabla de relación.
+ * @param userId - ID del usuario autenticado.
+ * @returns {Promise<(Liga & { puntos_totales: number })[]>} - Array de ligas con puntos.
+ */
+const getLeaguesByUserService = async (userId: number): Promise<Array<Liga & { puntos_totales: number }>> => {
+  try {
+    const leagues = await sql<Array<Liga & { puntos_totales: number }>>`
+      SELECT 
+        l.id,
+        l.name,
+        l.jornada_id,
+        l.created_by,
+        l.created_jornada,
+        l.code,
+        ul.puntos_totales
+      FROM ${sql(ligaTable)} l
+      JOIN ${sql(usuariosLigasTable)} ul ON l.id = ul.liga_id
+      WHERE ul.usuario_id = ${userId}
+      ORDER BY l.id;
+    `;
+    return leagues;
+  } catch (error) {
+    console.error('❌ Error fetching leagues for user:', error);
+    throw new Error('Database error while fetching leagues for user');
+  }
+};
+
+const generateValidPassword = (): string => {
+  const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const lower = 'abcdefghijklmnopqrstuvwxyz';
+  const digits = '0123456789';
+
+  const getRandom = (str: string) => str[Math.floor(Math.random() * str.length)];
+
+  // Garantizar al menos uno de cada tipo
+  const base = [getRandom(upper), getRandom(lower), getRandom(digits)];
+
+  const allChars = upper + lower + digits;
+  while (base.length < 10) {
+    base.push(getRandom(allChars));
+  }
+
+  // Mezclar
+  return base.sort(() => 0.5 - Math.random()).join('');
+};
+
+/**
+ * Servicio para recuperar contraseña y enviarla por correo
+ */
+const forgotPasswordService = async (correo: string): Promise<string> => {
+  try {
+    const [user] = await sql<UserI[]>`
+      SELECT id FROM ${sql(userTable)} WHERE correo = ${correo} LIMIT 1
+    `;
+    if (!user) throw new Error('User not found');
+
+    const newPassword = generateValidPassword();
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+
+    await sql`
+      UPDATE ${sql(userTable)} SET password = ${hashedPassword}
+      WHERE id = ${user.id!}
+    `;
+
+    // Validar variables de entorno
+    const fromEmail = process.env.EMAIL_USER;
+    const fromPass = process.env.EMAIL_PASS;
+    if (!fromEmail || !fromPass) {
+      throw new Error('Faltan credenciales de email en el entorno');
+    }
+
+    const transporter: Transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: fromEmail,
+        pass: fromPass
+      }
+    });
+
+    await transporter.sendMail({
+      from: `"FantasyDraft Soporte" <${fromEmail}>`,
+      to: correo,
+      subject: '🔐 Tu nueva contraseña temporal',
+      html: `
+        <h3>Hola 👋</h3>
+        <p>Has solicitado recuperar tu contraseña.</p>
+        <p><strong>Tu nueva contraseña temporal es:</strong></p>
+        <pre style="font-size: 16px; background: #f0f0f0; padding: 8px; display: inline-block;">${newPassword}</pre>
+        <p>Inicia sesión y cámbiala lo antes posible.</p>
+      `
+    });
+
+    return newPassword;
+  } catch (error) {
+    console.error(`❌ Error en forgotPasswordService:`, error);
+    throw new Error('No se pudo enviar la nueva contraseña');
+  }
+};
+
+const updateGoogleIdService = async (id: number, googleId: string): Promise<boolean> => {
+  try {
+    const result = await sql`
+      UPDATE ${sql(userTable)}
+      SET google_id = ${googleId}
+      WHERE id = ${id}
+      RETURNING id;
+    `;
+
+    return result.length > 0;
+  } catch (error) {
+    console.error(`❌ Error actualizando google_id:`, error);
+    throw new Error(`Database error while updating google_id`);
+  }
+};
+
+/**
+ * Obtener todos los usuarios.
+ * Nota: la paginación se manejará desde el frontend.
+ */
+const getAllUsersService = async (): Promise<UserI[]> => {
+  try {
+    const users = await sql<UserI[]>`
+      SELECT id, username, correo, is_admin, created_at, "birthDate"
+      FROM ${sql(userTable)}
+      ORDER BY id
+    `;
+    return users;
+  } catch (error) {
+    console.error("❌ Error fetching all users:", error);
+    throw new Error("Database error while fetching all users");
+  }
+};
+
+/**
+ * Obtiene la información del usuario por su id.
+ *
+ * @param userId - ID del usuario, obtenido desde res.locals.user.
+ * @returns El usuario si se encuentra, o null en caso contrario.
+ */
+const getMyUserService = async (userId: number): Promise<UserI | undefined> => {
+  try {
+    const [user] = await sql<UserI[]>`
+      SELECT id, username, correo, is_admin, created_at, "birthDate"
+      FROM ${sql(userTable)}
+      WHERE id = ${userId}
+      LIMIT 1;
+    `;
+    return user ?? null;
+  } catch (error) {
+    console.error("❌ Error fetching user data:", error);
+    throw new Error("Database error while fetching user data");
+  }
+};
 
 
 export { getUserService, getUserByIdService, createUserService, findUserByEmail,
   deleteUserByEmail, updateUserTokens, updateBirthDateService, updateUsernameService,
-  updatePasswordService, adminUpdateUserService, getUserByIdAdminService };
+  updatePasswordService, adminUpdateUserService, getUserByIdAdminService, getLeaguesByUserService,
+  forgotPasswordService, updateGoogleIdService, getAllUsersService, getMyUserService };

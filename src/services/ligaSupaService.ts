@@ -157,7 +157,195 @@ const isUserInLigaService = async (usuarioId: number, ligaId: number): Promise<b
   }
 };
 
+/**
+ * Buscar liga por id.
+ */
+const findLigaByIdService = async (id: number): Promise<Liga | undefined> => {
+  try {
+    const [liga] = await sql<Liga[]>`
+      SELECT id, name, jornada_id, created_by, created_jornada, code
+      FROM ${sql(ligaTable)}
+      WHERE id = ${id}
+      LIMIT 1
+    `;
+    return liga ?? null;
+  } catch (error) {
+    console.error(`❌ Error fetching league by id:`, error);
+    throw new Error(`Database error while fetching league`);
+  }
+};
 
+/**
+ * Obtener el código de una liga por id.
+ * Solo devuelve el código si el usuario autenticado es miembro de la liga.
+ *
+ * @param ligaId - Id de la liga.
+ * @param userId - Id del usuario autenticado.
+ * @returns {Promise<string>} - El código de la liga.
+ */
+const getLigaCodeByIdService = async (ligaId: number, userId: number): Promise<string> => {
+  // Buscar la liga por id.
+  const liga = await findLigaByIdService(ligaId);
+  if (!liga) {
+    throw new Error('Liga no encontrada');
+  }
+  
+  // Verificar si el usuario es miembro de la liga.
+  const isMember = await isUserInLigaService(userId, liga.id);
+  if (!isMember) {
+    throw new Error('No estás unido a esta liga');
+  }
+  
+  return liga.code;
+};
 
+/**
+ * Eliminar un usuario de una liga.
+ * Solo puede hacerlo el capitán de la liga.
+ *
+ * @param capitanId - ID del usuario que realiza la acción (capitán), obtenido desde res.locals.
+ * @param ligaId - ID de la liga.
+ * @param userIdToRemove - ID del usuario a eliminar.
+ * @returns {Promise<boolean>} - Retorna true si se eliminó correctamente.
+ */
+const removeUserFromLigaService = async (
+  capitanId: number,
+  ligaId: number,
+  userIdToRemove: number
+): Promise<boolean> => {
+  // Verificar que el usuario que realiza la acción es capitán en la liga.
+  const [captainRecord] = await sql`
+    SELECT is_capitan FROM ${sql(usuariosLigasTable)}
+    WHERE usuario_id = ${capitanId} AND liga_id = ${ligaId}
+    LIMIT 1;
+  `;
+  if (!captainRecord?.is_capitan) {
+    throw new Error('No eres el capitán de la liga');
+  }
 
-export { createLigaService, findLigaByCodeService, addUserToLigaService, getUsersByLigaService, isUserInLigaService };
+  // Opcional: Prevenir que el capitán se elimine a sí mismo.
+  if (capitanId === userIdToRemove) {
+    throw new Error('El capitán no puede eliminarse a sí mismo');
+  }
+
+  // Verificar que el usuario a eliminar está en la liga.
+  const [userRecord] = await sql`
+    SELECT 1 FROM ${sql(usuariosLigasTable)}
+    WHERE usuario_id = ${userIdToRemove} AND liga_id = ${ligaId}
+    LIMIT 1;
+  `;
+  if (!userRecord) {
+    throw new Error('El usuario a eliminar no está en la liga');
+  }
+
+  // Eliminar la relación del usuario en la liga.
+  await sql`
+    DELETE FROM ${sql(usuariosLigasTable)}
+    WHERE usuario_id = ${userIdToRemove} AND liga_id = ${ligaId};
+  `;
+
+  return true;
+};
+
+/**
+ * Asigna a otro usuario como capitán en una liga.
+ * Solo puede hacerlo el actual capitán.
+ *
+ * @param currentUserId - ID del usuario actual (desde res.locals).
+ * @param ligaId - ID de la liga.
+ * @param newCaptainId - ID del nuevo capitán.
+ */
+const assignNewCaptainService = async (
+  currentUserId: number,
+  ligaId: number,
+  newCaptainId: number
+): Promise<void> => {
+  // Verificar que el usuario actual es capitán en la liga.
+  const [current] = await sql`
+    SELECT is_capitan FROM ${sql(usuariosLigasTable)}
+    WHERE usuario_id = ${currentUserId} AND liga_id = ${ligaId}
+    LIMIT 1;
+  `;
+  if (!current?.is_capitan) {
+    throw new Error('No eres el capitán de esta liga');
+  }
+
+  if (currentUserId === newCaptainId) {
+    throw new Error('No puedes hacerte capitán a ti mismo');
+  }
+
+  // Verificar que el nuevo capitán pertenezca a la liga.
+  const [newCap] = await sql`
+    SELECT 1 FROM ${sql(usuariosLigasTable)}
+    WHERE usuario_id = ${newCaptainId} AND liga_id = ${ligaId}
+    LIMIT 1;
+  `;
+  if (!newCap) {
+    throw new Error('El nuevo capitán no pertenece a esta liga');
+  }
+
+  // Actualizar la tabla: quitar la capitanía al actual y asignarla al nuevo.
+  await sql`
+    UPDATE ${sql(usuariosLigasTable)}
+    SET is_capitan = CASE 
+      WHEN usuario_id = ${newCaptainId} THEN TRUE
+      WHEN usuario_id = ${currentUserId} THEN FALSE
+      ELSE is_capitan END
+    WHERE liga_id = ${ligaId} AND usuario_id IN (${currentUserId}, ${newCaptainId});
+  `;
+};
+
+/**
+ * Permite al usuario actual abandonar una liga.
+ * No puede hacerlo si es capitán.
+ *
+ * @param userId - ID del usuario actual (desde res.locals).
+ * @param ligaId - ID de la liga.
+ */
+const abandonLigaService = async (userId: number, ligaId: number): Promise<void> => {
+  const [record] = await sql`
+    SELECT is_capitan FROM ${sql(usuariosLigasTable)}
+    WHERE usuario_id = ${userId} AND liga_id = ${ligaId}
+    LIMIT 1;
+  `;
+  
+  if (!record) throw new Error('No estás en esta liga');
+  if (record.is_capitan) throw new Error('El capitán no puede abandonar la liga');
+
+  await sql`
+    DELETE FROM ${sql(usuariosLigasTable)}
+    WHERE usuario_id = ${userId} AND liga_id = ${ligaId};
+  `;
+};
+
+/**
+ * Obtiene la información básica de un usuario que pertenece a una liga,
+ * junto con los datos de la relación (puntos_totales, is_capitan).
+ *
+ * @param leagueId - ID de la liga.
+ * @param userId - ID del usuario.
+ * @returns Un objeto con la información del usuario y su relación en la liga.
+ */
+const getUserFromLeagueByIdService = async (leagueId: number, userId: number) => {
+  try {
+    const [record] = await sql`
+      SELECT u.id, u.username, u."birthDate", ul.puntos_totales, ul.is_capitan
+      FROM ${sql(userTable)} u
+      JOIN ${sql(usuariosLigasTable)} ul ON u.id = ul.usuario_id
+      WHERE ul.liga_id = ${leagueId} AND u.id = ${userId}
+      LIMIT 1;
+    `;
+    if (!record) {
+      throw new Error('Usuario no encontrado en la liga');
+    }
+
+    return record;
+  } catch (error) {
+    console.error('❌ Error fetching user from league:', error);
+    throw new Error('Database error while fetching user from league');
+  }
+};
+
+export { createLigaService, findLigaByCodeService, addUserToLigaService, getUsersByLigaService,
+  isUserInLigaService, getLigaCodeByIdService, removeUserFromLigaService, assignNewCaptainService,
+  abandonLigaService, getUserFromLeagueByIdService };
