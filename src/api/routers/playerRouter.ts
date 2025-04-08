@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getAllPlayersSupa, getPlayerById } from '../controllers/playserSupaController';
+import { getAllPlayersSupa, getPlayerById } from '../controllers/playserSupaController.js';
 const playerRouter = Router();
 
 playerRouter.get('/', getAllPlayersSupa);

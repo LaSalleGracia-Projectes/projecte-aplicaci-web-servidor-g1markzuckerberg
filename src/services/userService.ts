@@ -417,7 +417,29 @@ const getAllUsersService = async (): Promise<UserI[]> => {
   }
 };
 
+/**
+ * Obtiene la información del usuario por su id.
+ *
+ * @param userId - ID del usuario, obtenido desde res.locals.user.
+ * @returns El usuario si se encuentra, o null en caso contrario.
+ */
+const getMyUserService = async (userId: number): Promise<UserI | undefined> => {
+  try {
+    const [user] = await sql<UserI[]>`
+      SELECT id, username, correo, is_admin, created_at, "birthDate"
+      FROM ${sql(userTable)}
+      WHERE id = ${userId}
+      LIMIT 1;
+    `;
+    return user ?? null;
+  } catch (error) {
+    console.error("❌ Error fetching user data:", error);
+    throw new Error("Database error while fetching user data");
+  }
+};
+
+
 export { getUserService, getUserByIdService, createUserService, findUserByEmail,
   deleteUserByEmail, updateUserTokens, updateBirthDateService, updateUsernameService,
   updatePasswordService, adminUpdateUserService, getUserByIdAdminService, getLeaguesByUserService,
-  forgotPasswordService, updateGoogleIdService, getAllUsersService };
+  forgotPasswordService, updateGoogleIdService, getAllUsersService, getMyUserService };
