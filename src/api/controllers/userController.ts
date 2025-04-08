@@ -2,8 +2,7 @@ import { type Request, type Response, type NextFunction } from 'express';
 import path from 'path';
 import httpStatus from '../config/httpStatusCodes.js';
 import { updateUsernameService, updateBirthDateService, updatePasswordService, getLeaguesByUserService,
-  forgotPasswordService
-} from '../../services/userService.js';
+  forgotPasswordService, getMyUserService } from '../../services/userService.js';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 
@@ -161,6 +160,32 @@ const forgotPasswordController = async (req: Request, res: Response, next: NextF
   }
 };
 
+/**
+ * Controlador para que el usuario consulte sus propios datos.
+ * Se asume que el middleware de autenticación coloca en res.locals.user el usuario autenticado.
+ *
+ * Ejemplo de ruta: GET /api/v1/user/me
+ */
+const getMyUserController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    // Se extrae el usuario autenticado de res.locals
+    const currentUser = res.locals.user as { id: number };
+    if (!currentUser?.id) {
+      return res.status(httpStatus.unauthorized).json({ error: 'No autorizado' });
+    }
+
+    // Se obtiene la información del usuario usando el id extraído desde res.locals
+    const userData = await getMyUserService(currentUser.id);
+    if (!userData) {
+      return res.status(httpStatus.notFound).json({ error: 'Usuario no encontrado' });
+    }
+
+    res.status(httpStatus.ok).json({ user: userData });
+  } catch (error) {
+    next(error);
+  }
+};
 
 export { uploadUserImageController, updateUsernameController, updateBirthDateController,
-  updatePasswordController, getUserLeagues, getUserImageController, forgotPasswordController };
+  updatePasswordController, getUserLeagues, getUserImageController, forgotPasswordController,
+  getMyUserController };

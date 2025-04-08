@@ -2,7 +2,7 @@
 import { type Request, type Response, type NextFunction } from 'express';
 import { createLigaService, findLigaByCodeService, addUserToLigaService,
   getUsersByLigaService, isUserInLigaService, getLigaCodeByIdService, removeUserFromLigaService,
-  assignNewCaptainService, abandonLigaService } from '../../services/ligaSupaService.js';
+  assignNewCaptainService, abandonLigaService, getUserFromLeagueByIdService } from '../../services/ligaSupaService.js';
 import { getCurrentJornada, getJornadaByName } from '../../services/jornadaSupaService.js';
 import type Liga from '../../types/Liga.js';
 import httpStatus from '../config/httpStatusCodes.js';
@@ -110,28 +110,40 @@ const getUsersByLiga = async (req: Request, res: Response, next: NextFunction) =
     const { ligaCode } = req.params;
     const { jornada } = req.query as { jornada?: string };
 
-    // ✅ Verificar autenticación del usuario
+    // Verificar autenticación del usuario
     const user = res.locals.user as { id: number };
     if (!user?.id) {
-      return res.status(httpStatus.unauthorized).send({ error: 'No autorizado' });
+      return res.status(httpStatus.unauthorized).json({ error: 'No autorizado' });
     }
 
-    // ✅ Buscar la liga por código
+    // Buscar la liga por código
     const liga = await findLigaByCodeService(ligaCode);
     if (!liga) {
-      return res.status(httpStatus.notFound).send({ error: 'Liga no encontrada' });
+      return res.status(httpStatus.notFound).json({ error: 'Liga no encontrada' });
     }
 
-    // ✅ Verificar si el usuario está en la liga
+    // Verificar si el usuario está en la liga
     const isUserInLiga = await isUserInLigaService(user.id, liga.id);
     if (!isUserInLiga) {
-      return res.status(httpStatus.unauthorized).send({ error: 'No estás unido a esta liga' });
+      return res.status(httpStatus.unauthorized).json({ error: 'No estás unido a esta liga' });
     }
 
-    // ✅ Llamar al servicio para obtener usuarios de la liga
-    const data = await getUsersByLigaService(ligaCode, jornada);
+    // Obtener usuarios de la liga (según el código y, opcionalmente, la jornada)
+    const result = await getUsersByLigaService(ligaCode, jornada);
 
-    res.status(httpStatus.ok).send(data);
+    // Procesar cada registro para agregar la URL de la imagen de perfil
+    const typedUsers = (result.users as unknown) as Array<{ [key: string]: any; id: number }>;
+    const usersWithImage = typedUsers.map((userRecord) => ({
+      ...userRecord,
+      imageUrl: `/api/v1/user/get-image?userId=${userRecord.id}`
+    }));
+
+    // Retornar la información de la liga, la lista de usuarios con imagen y la jornada consultada
+    res.status(httpStatus.ok).json({
+      liga: result.liga,
+      users: usersWithImage,
+      jornada_id: result.jornada_id
+    });
   } catch (error) {
     next(error);
   }
@@ -284,7 +296,43 @@ const getLeagueImageController = async (req: Request, res: Response, next: NextF
   }
 };
 
+/**
+ * Controlador para obtener la información de un usuario dentro de una liga.
+ * Se espera que en la URL se envíen:
+ *   - leagueId: ID de la liga.
+ *   - userId: ID del usuario.
+ *
+ * La respuesta incluye la información del usuario (username, birthDate),
+ * los datos de la relación en la liga (puntos_totales, is_capitan) y
+ * la URL de su imagen de perfil.
+ */
+const getUserFromLeagueController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { leagueId, userId } = req.params;
+    const parsedLeagueId = Number(leagueId);
+    const parsedUserId = Number(userId);
+    
+    if (isNaN(parsedLeagueId) || isNaN(parsedUserId)) {
+      return res.status(httpStatus.badRequest).json({ error: 'ID inválido' });
+    }
+    
+    // Se asume que la autenticación y verificación de membresía se realizan en middleware
+    const userRecord = await getUserFromLeagueByIdService(parsedLeagueId, parsedUserId);
+    
+    // Agregar la URL de la imagen de perfil (ej: /api/v1/user/get-image?userId=<ID>)
+    const userWithImage = {
+      ...userRecord,
+      imageUrl: `/api/v1/user/get-image?userId=${userRecord.id}`
+    };
+    
+    res.status(httpStatus.ok).json({ user: userWithImage });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export { createLiga, joinLiga, getUsersByLiga, getLigaCodeById, removeUserFromLiga,
-  assignNewCaptain, abandonLiga, uploadLeagueImageByCaptainController, getLeagueImageController };
+  assignNewCaptain, abandonLiga, uploadLeagueImageByCaptainController, getLeagueImageController,
+  getUserFromLeagueController };
 
 

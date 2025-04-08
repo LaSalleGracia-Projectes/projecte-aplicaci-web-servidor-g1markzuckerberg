@@ -153,4 +153,36 @@ async function uploadJugadorEquipoSeasonRelation(players: Player[], seasonId: nu
     }
 }
 
-export { getAllPlayersFromTeams, uploadPlayersToSupabase, uploadJugadorEquipoSeasonRelation };
+/**
+ * Obtiene todos los jugadores desde Supabase.
+ * @returns {Promise<Player[]>} Lista de jugadores.
+ */
+async function getAllPlayersFromSupabase(): Promise<any[]> {
+    try {
+        const players = await sql`SELECT * FROM ${sql(jugadoresTable)}`;
+        return players;
+    } catch (error: any) {
+        throw new Error(`Error obteniendo jugadores de Supabase: ${error.message}`);
+    }
+}
+
+/**
+ * Obtiene un jugador por su ID desde Supabase.
+ * @param {number} playerId - ID del jugador.
+ * @returns {Promise<Player | undefined>} Jugador o undefined si no se encuentra.
+ */
+async function getPlayerByIdFromSupabase(playerId: number): Promise<any> {
+    try {
+        const [player] = await sql`
+            SELECT * FROM ${sql(jugadoresTable)}
+            WHERE id = ${playerId}
+            LIMIT 1
+        `;
+        return player;
+    } catch (error: any) {
+        throw new Error(`Error obteniendo jugador con id ${playerId} de Supabase: ${error.message}`);
+    }
+}
+
+export { getAllPlayersFromTeams, uploadPlayersToSupabase, uploadJugadorEquipoSeasonRelation,
+    getAllPlayersFromSupabase, getPlayerByIdFromSupabase };

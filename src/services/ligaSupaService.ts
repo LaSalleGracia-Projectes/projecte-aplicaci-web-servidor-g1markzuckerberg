@@ -318,6 +318,34 @@ const abandonLigaService = async (userId: number, ligaId: number): Promise<void>
   `;
 };
 
+/**
+ * Obtiene la información básica de un usuario que pertenece a una liga,
+ * junto con los datos de la relación (puntos_totales, is_capitan).
+ *
+ * @param leagueId - ID de la liga.
+ * @param userId - ID del usuario.
+ * @returns Un objeto con la información del usuario y su relación en la liga.
+ */
+const getUserFromLeagueByIdService = async (leagueId: number, userId: number) => {
+  try {
+    const [record] = await sql`
+      SELECT u.id, u.username, u."birthDate", ul.puntos_totales, ul.is_capitan
+      FROM ${sql(userTable)} u
+      JOIN ${sql(usuariosLigasTable)} ul ON u.id = ul.usuario_id
+      WHERE ul.liga_id = ${leagueId} AND u.id = ${userId}
+      LIMIT 1;
+    `;
+    if (!record) {
+      throw new Error('Usuario no encontrado en la liga');
+    }
+
+    return record;
+  } catch (error) {
+    console.error('❌ Error fetching user from league:', error);
+    throw new Error('Database error while fetching user from league');
+  }
+};
+
 export { createLigaService, findLigaByCodeService, addUserToLigaService, getUsersByLigaService,
   isUserInLigaService, getLigaCodeByIdService, removeUserFromLigaService, assignNewCaptainService,
-  abandonLigaService };
+  abandonLigaService, getUserFromLeagueByIdService };
