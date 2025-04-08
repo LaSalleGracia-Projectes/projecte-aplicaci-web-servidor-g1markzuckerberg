@@ -26,7 +26,7 @@ const POSITION_DL = 27;
  * Ejemplo de endpoint: https://api.sportmonks.com/v3/football/fixtures/{fixtureId}?api_token=...&include=lineups
  */
 export const getFixtureLineups = async (fixtureId: number): Promise<LineupPlayer[]> => {
-  const response = await axios.get(`https://api.sportmonks.com/v3/football/fixtures/${fixtureId}`, {
+  const response = await axios.get(https://api.sportmonks.com/v3/football/fixtures/${fixtureId}, {
     params: {
       api_token: apiToken,
       include: 'lineups'
@@ -42,7 +42,7 @@ export const getFixtureLineups = async (fixtureId: number): Promise<LineupPlayer
  * Obtiene los eventos del fixture.
  */
 export const getFixtureEvents = async (fixtureId: number): Promise<Event[]> => {
-  const response = await axios.get(`https://api.sportmonks.com/v3/football/fixtures/${fixtureId}`, {
+  const response = await axios.get(https://api.sportmonks.com/v3/football/fixtures/${fixtureId}, {
     params: {
       api_token: apiToken,
       include: 'events'
@@ -408,7 +408,7 @@ export const processFixtureFantasyPoints = async (
   ]);
 
   // Se consulta el fixture con estadísticas (sin incluir datos de equipos)
-  const fixtureResponse = await axios.get(`https://api.sportmonks.com/v3/football/fixtures/${fixtureId}`, {
+  const fixtureResponse = await axios.get(https://api.sportmonks.com/v3/football/fixtures/${fixtureId}, {
     params: { api_token: apiToken, include: 'statistics' }
   });
   const fixtureResult: FixtureResult = fixtureResponse.data.data;
@@ -602,7 +602,7 @@ export const getFixturesForRound = async (
   roundId: number
 ): Promise<{ fixtureIds: number[]; matchday: number }> => {
   try {
-    const response = await axios.get(`https://api.sportmonks.com/v3/football/rounds/${roundId}`, {
+    const response = await axios.get(https://api.sportmonks.com/v3/football/rounds/${roundId}, {
       params: {
         api_token: apiToken,
         include: 'fixtures'
@@ -613,7 +613,7 @@ export const getFixturesForRound = async (
 
     // Validaciones añadidas aquí:
     if (!roundData?.fixtures) {
-      console.warn(`⚠️ No se encontraron fixtures para la ronda ${roundId}.`);
+      console.warn(⚠ No se encontraron fixtures para la ronda ${roundId}.);
       return { fixtureIds: [], matchday: roundId };
     }
 
@@ -623,7 +623,7 @@ export const getFixturesForRound = async (
     return { fixtureIds, matchday };
 
   } catch (error: any) {
-    console.error(`❌ Error en la llamada a la API Sportmonks para la ronda ${roundId}:`, error.response?.data ?? error.message);
+    console.error(❌ Error en la llamada a la API Sportmonks para la ronda ${roundId}:, error.response?.data ?? error.message);
     return { fixtureIds: [], matchday: roundId };
   }
 };
@@ -637,7 +637,7 @@ export const processRoundFantasyPoints = async (
   const { fixtureIds } = await getFixturesForRound(roundId);
 
   if (fixtureIds.length === 0) {
-    console.warn(`⚠️ No hay partidos disponibles para la ronda ${roundId}.`);
+    console.warn(⚠ No hay partidos disponibles para la ronda ${roundId}.);
     return [];
   }
 
@@ -652,6 +652,6 @@ export async function getAllDbPlayers(): Promise<Array<Pick<Jugador, 'id' | 'dis
     return jugadores.map((row: any) => ({ id: row.id, displayName: row.displayName }));
   } catch (error: any) {
     console.error("❌ Error al obtener jugadores de la base de datos:", error);
-    throw new Error(`Error leyendo jugadores: ${error.message}`);
-  }
+    throw new Error(Error leyendo jugadores: ${error.message});
+  }
 }
