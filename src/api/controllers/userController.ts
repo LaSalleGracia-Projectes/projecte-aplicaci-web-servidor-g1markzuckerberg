@@ -124,27 +124,39 @@ const getUserLeagues = async (req: Request, res: Response, next: NextFunction) =
 
 const getUserImageController = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const user = res.locals.user as { id: number };
-    if (!user?.id) {
+    // Obtenemos el usuario logueado de res.locals.user
+    const loggedUser = res.locals.user as { id: number };
+
+    // Opcionalmente, se puede pasar el id del usuario cuya imagen se desea obtener
+    // ya sea como query parameter (/?userId=XX) o como parámetro de ruta (/:userId)
+    const userIdParam = req.query.userId ?? req.params.userId;
+    // Si se pasa, lo convertimos a number; de lo contrario se usa el id del usuario logueado.
+    const userId = userIdParam ? Number(userIdParam) : loggedUser.id;
+
+    if (!userId) {
       return res.status(httpStatus.unauthorized).json({ error: 'No autorizado' });
     }
 
+    // Determinamos la carpeta de imágenes
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = path.dirname(__filename);
     const dir = path.join(__dirname, '../../../public/img/users');
 
+    // Leemos la carpeta y buscamos el archivo que empieza por "userImage{userId}"
     const files = fs.readdirSync(dir);
-    const imageFile = files.find(fileName => fileName.startsWith(`userImage${user.id}`));
+    const imageFile = files.find(fileName => fileName.startsWith(`userImage${userId}`));
 
+    // Si no se encuentra una imagen específica, se usa una imagen por defecto
     const imagePath = imageFile
       ? path.join(dir, imageFile)
-      : path.join(dir, 'defaultUser.png'); // Fallback
+      : path.join(dir, 'defaultUser.png');
 
     res.sendFile(imagePath);
   } catch (error) {
     next(error);
   }
 };
+
 
 const forgotPasswordController = async (req: Request, res: Response, next: NextFunction) => {
   try {
