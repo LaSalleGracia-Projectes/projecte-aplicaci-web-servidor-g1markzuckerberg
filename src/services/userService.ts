@@ -288,9 +288,9 @@ const adminUpdateUserService = async (adminId: number, userId: number, updates: 
  * @param userId - ID del usuario autenticado.
  * @returns {Promise<(Liga & { puntos_totales: number })[]>} - Array de ligas con puntos.
  */
-const getLeaguesByUserService = async (userId: number): Promise<Array<Liga & { puntos_totales: number }>> => {
+const getLeaguesByUserService = async (userId: number): Promise<Array<Liga & { puntos_totales: number, total_users: number }>> => {
   try {
-    const leagues = await sql<Array<Liga & { puntos_totales: number }>>`
+    const leagues = await sql<Array<Liga & { puntos_totales: number, total_users: number }>>`
       SELECT 
         l.id,
         l.name,
@@ -298,7 +298,12 @@ const getLeaguesByUserService = async (userId: number): Promise<Array<Liga & { p
         l.created_by,
         l.created_jornada,
         l.code,
-        ul.puntos_totales
+        ul.puntos_totales,
+        (
+          SELECT COUNT(*) 
+          FROM ${sql(usuariosLigasTable)} ul2
+          WHERE ul2.liga_id = l.id
+        ) AS total_users
       FROM ${sql(ligaTable)} l
       JOIN ${sql(usuariosLigasTable)} ul ON l.id = ul.liga_id
       WHERE ul.usuario_id = ${userId}
