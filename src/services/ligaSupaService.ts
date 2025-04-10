@@ -103,7 +103,7 @@ const getUsersByLigaService = async (ligaCode: string, jornadaName?: string) => 
     const jornadaNumber = Number(jornada.name);
     const createdJornadaNumber = liga.created_jornada;
 
-    // Validar que la jornada consultada no sea anterior a la jornada de creación de la liga
+    // Validar que la jornada consultada no sea anterior a la jornada en que se creó la liga
     if (jornadaNumber < createdJornadaNumber) {
       throw new Error(
         `No se puede consultar la jornada ${jornadaNumber} porque la liga fue creada en la jornada ${createdJornadaNumber}.`
@@ -120,8 +120,19 @@ const getUsersByLigaService = async (ligaCode: string, jornadaName?: string) => 
     }
 
     // Consultar la vista vw_puntos_acumulados para obtener los usuarios con sus puntos
+    // Se asegura que cada registro tenga el id del usuario (alias "id")
+    // y se agrega una subconsulta que cuenta el total de usuarios de la liga.
     const users = await sql`
-      SELECT u.username, v.usuario_id, v.puntos_jornada, v.puntos_acumulados
+      SELECT 
+        u.username, 
+        u.id AS id, 
+        v.puntos_jornada, 
+        v.puntos_acumulados,
+        (
+          SELECT COUNT(*) 
+          FROM ${sql(usuariosLigasTable)} ul
+          WHERE ul.liga_id = ${liga.id}
+        ) AS total_users
       FROM vw_puntos_acumulados v
       JOIN ${sql(userTable)} u ON v.usuario_id = u.id
       WHERE v.liga_id = ${liga.id} AND v.jornada_id = ${jornadaId}
@@ -131,8 +142,8 @@ const getUsersByLigaService = async (ligaCode: string, jornadaName?: string) => 
     // eslint-disable-next-line @typescript-eslint/naming-convention
     return { liga, users, jornada_id: jornadaId };
   } catch (error) {
-    console.error(`❌ Error al obtener usuarios de la liga:`, error);
-    throw new Error(`Database error while fetching league users`);
+    console.error('❌ Error al obtener usuarios de la liga:', error);
+    throw new Error('Database error while fetching league users');
   }
 };
 
