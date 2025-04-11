@@ -1,0 +1,1 @@
+export const tempPlantillaTable = "tempPlanmtilla"; // Nombre de la tabla en Supabase

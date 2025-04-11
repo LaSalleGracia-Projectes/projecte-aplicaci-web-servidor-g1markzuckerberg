@@ -1,0 +1,1 @@
+export const plantillaJugadoresTable = "plantilla_jugadores";

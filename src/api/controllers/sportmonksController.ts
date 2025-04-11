@@ -29,20 +29,19 @@ export const getAllPlayers = (req: Request, res: Response) => {
  * @param {Response} res - Objeto de respuesta HTTP.
  * @returns {void} Responde con un JSON que contiene los fixtures de la jornada o un mensaje de error.
  */
-export const getFixturesByRound = (req: Request, res: Response) => {
+export const getFixturesByRound = async (req: Request, res: Response) => {
     const { roundNumber } = req.params;
-
-    getFixturesByRoundNumber(roundNumber)
-        .then((fixtures) => res.status(200).json({ jornada: roundNumber, fixtures }))
-        .catch((error) => {
-            console.error('Error al obtener las jornadas:', error);
-            res.status(500).json({
-                error: 'Error al obtener las jornadas',
-                message: error instanceof Error ? error.message : 'Error desconocido',
-            });
-        });
-};
-
+    try {
+      const fixtures = await getFixturesByRoundNumber(roundNumber);
+      res.status(200).json({ jornada: roundNumber, fixtures });
+    } catch (error) {
+      console.error('Error al obtener las jornadas:', error);
+      res.status(500).json({
+        error: 'Error al obtener las jornadas',
+        message: error instanceof Error ? error.message : 'Error desconocido',
+      });
+    }
+  };
 /**
  * Controlador para obtener la jornada actual en curso.
  *
@@ -50,6 +49,7 @@ export const getFixturesByRound = (req: Request, res: Response) => {
  * @param {Response} res - Objeto de respuesta HTTP.
  * @returns {void} Responde con un JSON que contiene la jornada actual o un mensaje de error si no se encuentra.
  */
+
 export const getCurrentFixtureRounds = (req: Request, res: Response) => {
     getCurrentRounds()
         .then((rounds) => {

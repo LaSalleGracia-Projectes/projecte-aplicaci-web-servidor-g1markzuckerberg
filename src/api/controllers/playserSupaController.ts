@@ -1,6 +1,7 @@
 import { type Request, type Response, type NextFunction } from 'express';
 import httpStatus from '../config/httpStatusCodes.js';
 import { getAllPlayersFromSupabase, getPlayerByIdFromSupabase } from '../../services/playerService.js';
+import type Player from '../../types/Player.js';
 
 /**
  * Controlador para obtener todos los jugadores desde Supabase.
@@ -27,13 +28,15 @@ async function getPlayerById(req: Request, res: Response, next: NextFunction): P
       return;
     }
 
-    const player = await getPlayerByIdFromSupabase(playerId) as undefined;
+    // No hagas cast a undefined; solamente espera el resultado.
+    const player = await getPlayerByIdFromSupabase(playerId) as Player | undefined;
     
     if (!player) {
       res.status(httpStatus.notFound).json({ message: 'Player not found' });
       return;
     }
     
+    // Se asume que player ya incluye los campos adicionales (por ejemplo, teamName y teamImage)
     res.status(httpStatus.ok).json({ player });
   } catch (error: unknown) {
     next(error);

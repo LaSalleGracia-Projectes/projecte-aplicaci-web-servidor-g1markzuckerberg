@@ -12,7 +12,7 @@ const userRouter = Router();
 // Ruta para subir la imagen de usuario
 userRouter.post('/upload-image', authMiddleware, upload.single('image'), uploadUserImageController);
 // Ruta para obtener la imagen de usuario
-userRouter.get('/get-image', authMiddleware, getUserImageController);
+userRouter.get('/get-image/:userId?', authMiddleware, getUserImageController);
 // Ruta para actualizar el username del usuario
 userRouter.put('/update-username', authMiddleware, validate(updateUsernameSchema, 'body'), updateUsernameController);
 // Ruta para actualizar la fecha de nacimiento del usuario
