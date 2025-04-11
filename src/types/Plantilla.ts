@@ -5,6 +5,7 @@ interface Plantilla {
   created_at: string;
   jornada_id: number;
   formation: string;
+  finalized: boolean;
 }
 
 export default Plantilla;
