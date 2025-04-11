@@ -1,14 +1,14 @@
-import { sql } from "./supabaseService";
-import { plantillaJugadoresTable } from "../models/PlantillaJugadores";
-import { tempPlantillaTable } from "../models/TempPlantilla";
-import { plantillaTable } from "../models/Plantilla";
-import type Plantilla from "../types/Plantilla";
-import PlantillaJugador from "../types/PlantillaJugador";
-import type TempPlantilla from "../types/TempPlantilla";
-import type Player from "../types/Player";
-import type Round from "../types/Round";
-import type { PositionOptions } from "../types/TempPlantilla";
-import { getCurrentJornada } from "./jornadaSupaService";
+import { sql } from "./supabaseService.js";
+import { plantillaJugadoresTable } from "../models/PlantillaJugadores.js";
+import { tempPlantillaTable } from "../models/TempPlantilla.js";
+import { plantillaTable } from "../models/Plantilla.js";
+import type Plantilla from "../types/Plantilla.js";
+import PlantillaJugador from "../types/PlantillaJugador.js";
+import type TempPlantilla from "../types/TempPlantilla.js";
+import type Player from "../types/Player.js";
+import type Round from "../types/Round.js";
+import type { PositionOptions } from "../types/TempPlantilla.js";
+import { getCurrentJornada } from "./jornadaSupaService.js";
 
 /**
  * Selecciona jugadores aleatoriamente para una posición usando un algoritmo de selección
