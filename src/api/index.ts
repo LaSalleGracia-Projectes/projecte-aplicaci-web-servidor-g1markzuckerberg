@@ -7,6 +7,7 @@ import adminRouter from './routers/adminRouter.js';
 import partidoRouter from './routers/partidoRouter.js';
 import jornadaJugadorRouter from './routers/jornadaJugadorRouter.js';
 import playerRouter from './routers/playerRouter.js';
+import draftRouter from './routers/draftRouter.js';
 
 const apiRouter = Router();
 
@@ -28,5 +29,7 @@ apiRouter.use('/partidos', partidoRouter);
 apiRouter.use('/jornadaJugador', jornadaJugadorRouter);
 
 apiRouter.use('/player', playerRouter);
+
+apiRouter.use('/draft', draftRouter);
 
 export default apiRouter;
