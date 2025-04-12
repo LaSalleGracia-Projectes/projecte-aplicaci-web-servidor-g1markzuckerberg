@@ -6,6 +6,7 @@ import { uploadUserImageController, updateBirthDateController, updatePasswordCon
   getMyUserController } from '../../api/controllers/userController.js';
 import validate from '../middlewares/joiValidation.js';
 import { updateBirthDateSchema, updatePwdSchema, updateUsernameSchema } from '../models/Joi/userSchemas.js';
+import { getNotificationsController } from '../controllers/notificacionesController.js';
 
 const userRouter = Router();
 
@@ -23,6 +24,9 @@ userRouter.get('/leagues', authMiddleware, getUserLeagues);
 userRouter.post('/forgot-password', forgotPasswordController);
 
 userRouter.get('/me', authMiddleware, getMyUserController);
+
+// Ruta para obtener las notificaciones del usuario
+userRouter.get('/notifications', authMiddleware, getNotificationsController);
 
 
 export default userRouter;
