@@ -197,5 +197,4 @@ async function getRoundsBySeasonId(seasonId: number): Promise<Round[]> {
     }
 }
 
-
 export { getFixturesByRoundNumber, getCurrentRounds, getCurrentSeasonId, getRoundsBySeasonId };

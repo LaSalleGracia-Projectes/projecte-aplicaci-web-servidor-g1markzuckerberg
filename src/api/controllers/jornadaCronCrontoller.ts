@@ -6,13 +6,16 @@ import {
   insertJornadasIfNotExist, 
   seasonExists, 
   insertSeason,
-  getAllJornadas
+  getAllJornadas,
+  getNextJornada
 } from '../../services/jornadaSupaService.js';
 import { getTeamsByCurrentSeason, uploadTeamsToSupabase } from '../../services/teamService.js';
 import { uploadJugadorEquipoSeasonRelation, uploadPlayersToSupabase, getAllPlayersFromTeams } from '../../services/playerService.js';
 import { getRoundsBySeasonId, getCurrentSeasonId } from '../../services/fixturesService.js';
 import type Round from '../../types/Round.js';
 import { uploadRoundFantasyPoints } from '../../services/jornadaJugadorService.js';
+import type { Server as SocketIOServer } from "socket.io";
+import { createGlobalNotification } from '../../services/notificacionesService.js';
 
 // URL Base de la API Sportmonks
 // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -166,6 +169,64 @@ const executeFantasyPointsJob = async () => {
   }
 };
 
+/**
+ * Verifica si hoy es el último día de la jornada actual y, en ese caso,
+ * obtiene la siguiente jornada (asumiendo que su id es el actual + 1) y
+ * envía una notificación global informando que se abre el plazo para crear los drafts
+ * hasta el inicio (starting_at) de la siguiente jornada.
+ */
+export async function notifyDraftOpeningAt6am(): Promise<void> {
+  try {
+    console.log("⏳ [notifyDraftOpeningAt6am] Verificando si hoy es el último día de la jornada actual...");
+
+    // Obtener la jornada actual (se asume que getCurrentJornada ya está implementada)
+    const currentRound: Round | undefined = await getCurrentJornada();
+    if (!currentRound) {
+      console.warn("⚠️ [notifyDraftOpeningAt6am] No se encontró la jornada actual");
+      return;
+    }
+
+    // Comprobar si hoy es el último día de la jornada actual comparando solo año, mes y día.
+    const today = new Date();
+    const endingAt = new Date(currentRound.ending_at);
+    const isLastDay =
+      today.getFullYear() === endingAt.getFullYear() &&
+      today.getMonth() === endingAt.getMonth() &&
+      today.getDate() === endingAt.getDate();
+
+    if (!isLastDay) {
+      console.log("🔄 [notifyDraftOpeningAt6am] Hoy no es el último día de la jornada actual; no se envía notificación.");
+      return;
+    }
+
+    // Obtener la siguiente jornada (se asume que getNextJornada ya está implementada y que la siguiente tiene id = current.id + 1)
+    const nextRound: Round | undefined = await getNextJornada();
+    if (!nextRound) {
+      console.warn("⚠️ [notifyDraftOpeningAt6am] No se encontró la siguiente jornada (id = currentJornada.id + 1)");
+      return;
+    }
+
+    const nextStartDate = new Date(nextRound.starting_at);
+    const formattedDate = nextStartDate.toLocaleDateString();
+    const mensaje = `Ya se abre el plazo para crear los drafts hasta el ${formattedDate}`;
+
+    // Crear la notificación global
+    const notification = await createGlobalNotification(mensaje);
+
+    // Obtener la instancia de Socket.io (suponiendo que está guardada en global.app.locals.io)
+    const io = (global as any).app?.locals?.io as SocketIOServer | undefined;
+    if (io) {
+      io.emit("notification", notification);
+      console.log("✅ [notifyDraftOpeningAt6am] Notificación global enviada:", mensaje);
+    } else {
+      console.warn("⚠️ [notifyDraftOpeningAt6am] No se encontró la instancia de Socket.io");
+    }
+  } catch (error: any) {
+    console.error("❌ [notifyDraftOpeningAt6am] Error:", error);
+  }
+}
+
+
 
 
 /**
@@ -185,6 +246,12 @@ const startJornadaCronJob = () => {
   cron.schedule('*/45 * * * * *', () => {
     console.log('🔄 Cron job de actualización de puntos fantasy iniciado cada 5h...');
     void executeFantasyPointsJob();
+  });
+
+  // Programa el cron job para que se ejecute a las 6:00 AM diariamente.
+  cron.schedule("0 6 * * *", () => {
+    void notifyDraftOpeningAt6am();
+    console.log("🔄 Cron job ejecutado a las 6:00 AM");
   });
 
   console.log('🔄 Cron job de actualización de jornadas iniciado...');

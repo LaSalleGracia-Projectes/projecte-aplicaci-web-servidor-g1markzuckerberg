@@ -357,6 +357,27 @@ const getUserFromLeagueByIdService = async (leagueId: number, userId: number) =>
   }
 };
 
+/**
+ * Obtiene la información de una liga a partir de su ID.
+ * 
+ * @param id - ID de la liga.
+ * @returns La liga encontrada o null si no existe.
+ */
+const getLigaByIdService = async (id: number): Promise<Liga | undefined> => {
+  try {
+    const [liga] = await sql<Liga[]>`
+      SELECT id, name, jornada_id, created_by, created_jornada, code
+      FROM ${sql(ligaTable)}
+      WHERE id = ${id}
+      LIMIT 1
+    `;
+    return liga ?? null;
+  } catch (error: any) {
+    console.error("❌ Error fetching league by id:", error);
+    throw new Error("Database error while fetching league");
+  }
+};
+
 export { createLigaService, findLigaByCodeService, addUserToLigaService, getUsersByLigaService,
   isUserInLigaService, getLigaCodeByIdService, removeUserFromLigaService, assignNewCaptainService,
-  abandonLigaService, getUserFromLeagueByIdService };
+  abandonLigaService, getUserFromLeagueByIdService, getLigaByIdService };
