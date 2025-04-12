@@ -1,8 +1,6 @@
 import { sql } from "./supabaseService.js";
-import type Notificacion from "../types/notificaciones.js";
-
-// Ajusta si tienes un archivo con la definición de la tabla 'notificaciones'.
-import { notificacionesTable } from "../models/Notificaciones";
+import type Notificacion from "../types/Notificaciones.js";
+import { notificacionesTable } from "../models/Notificaciones.js";
 
 /**
  * Crea una notificación para un usuario específico (usuario_id).
@@ -39,4 +37,26 @@ export async function createGlobalNotification(mensaje: string): Promise<Notific
     RETURNING id, mensaje, usuario_id, is_global, created_at
   `;
   return inserted;
+}
+
+/**
+ * Obtiene todas las notificaciones para un usuario específico, incluyendo notificaciones 
+ * globales, ordenadas por fecha de creación de forma descendiente.
+ *
+ * @param userId - ID del usuario.
+ * @returns Un arreglo de Notificacion.
+ */
+export async function getNotificationsByUserId(userId: number): Promise<Notificacion[]> {
+  try {
+    const notifications = await sql<Notificacion[]>`
+      SELECT id, mensaje, usuario_id, is_global, created_at
+      FROM ${sql(notificacionesTable)}
+      WHERE usuario_id = ${userId} OR is_global = true
+      ORDER BY created_at DESC
+    `;
+    return notifications;
+  } catch (error: any) {
+    console.error("❌ Error fetching notifications for user:", error);
+    throw new Error("Database error while fetching notifications");
+  }
 }

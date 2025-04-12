@@ -1,8 +1,9 @@
 import httpStatus from '../config/httpStatusCodes.js';
 import type { Request, Response, NextFunction } from 'express';
 import type { Server as SocketIOServer } from 'socket.io';
-import { createNotificationForUser, createGlobalNotification } from '../../services/notificacionesService.js';
-import type Notificacion from '../../types/notificaciones.js';
+import { createNotificationForUser, createGlobalNotification, getNotificationsByUserId } from '../../services/notificacionesService.js';
+import type Notificacion from '../../types/Notificaciones.js';
+import { getLigaByIdService } from '../../services/ligaSupaService.js';
 
 /**
  * Crea una notificación para un usuario específico y emite el evento a través de socket.io.
@@ -63,4 +64,25 @@ async function sendGlobalNotificationController(req: Request, res: Response, nex
   }
 }
 
-export { sendUserNotificationController, sendGlobalNotificationController };
+/**
+ * Ejemplo de ruta: GET /api/v1/notificaciones
+ * No se reciben parámetros en la URL; se toma el userId de res.locals.user.
+ * Obtiene las notificaciones (tanto las específicas del usuario como las globales) 
+ * ordenadas por fecha descendiente.
+ */
+async function getNotificationsController(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { user } = res.locals as { user: { id: number } };
+    if (!user?.id) {
+      res.status(httpStatus.unauthorized).json({ error: 'Usuario no autenticado' });
+      return;
+    }
+
+    const notifications = await getNotificationsByUserId(user.id);
+    res.status(httpStatus.ok).json({ notifications });
+  } catch (error: unknown) {
+    next(error);
+  }
+}
+
+export { sendUserNotificationController, sendGlobalNotificationController, getNotificationsController };
