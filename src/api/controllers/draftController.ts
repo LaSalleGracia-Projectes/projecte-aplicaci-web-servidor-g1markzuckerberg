@@ -32,12 +32,23 @@ const createDraftController = async (req: Request, res: Response, next: NextFunc
       return;
     }
 
-    const { formation, liga } = req.body as { formation: string; liga: Liga };
-    if (!formation || !liga?.id) {
-      res.status(httpStatus.badRequest).json({ error: 'Faltan parámetros (formation y/o liga)' });
+    const { formation, ligaId } = req.body as { formation: string; ligaId: number };
+    if (!formation || !ligaId) {
+      res.status(httpStatus.badRequest).json({ error: 'Faltan parámetros (formation y/o liga_id)' });
       return;
     }
-    
+
+    const liga: Liga = { 
+      id: ligaId, 
+      name: "", 
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      created_by: "", 
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      jornada_id: 0, 
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      created_jornada: 0, 
+      code: "" 
+    };
     const tempDraft = await createDraftForRound(user.id, formation, liga);
     res.status(httpStatus.ok).json({ tempDraft });
   } catch (error: unknown) {
@@ -58,6 +69,7 @@ const createDraftController = async (req: Request, res: Response, next: NextFunc
  * @param next - Next function.
  * @returns {Promise<void>}
  */
+
 const updateDraftController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { user } = res.locals as { user: { id: number } };
