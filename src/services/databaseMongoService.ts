@@ -1,7 +1,7 @@
 import { type Document } from 'mongoose';
-import type ContactForm from '../types/ContactFormMongo';
-import type UserI from '../types/UserI';
-import contactFormModel from '../models/ContactFormSchema';
+import type ContactForm from '../types/ContactFormMongo.js';
+import type UserI from '../types/UserI.js';
+import contactFormModel from '../models/ContactFormSchema.js';
 
 /**
  * Crea un nuevo formulario de contacto.
