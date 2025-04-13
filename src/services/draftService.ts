@@ -30,7 +30,7 @@ async function getWeightedRandomPlayersByPosition(
     SELECT *
     FROM ${sql("jugadores")}
     WHERE "positionId" = ${positionId}
-      AND id NOT IN (${sql(excludeIds)})
+    ${excludeIds.length > 0 ? sql`AND id NOT IN ${sql(excludeIds)}` : sql``}
   `;
 
   if (players.length < limit) {
@@ -53,6 +53,7 @@ async function getWeightedRandomPlayersByPosition(
     const totalWeight = available.reduce((sum, p) => sum + weight(p), 0);
     let randomValue = Math.random() * totalWeight;
     let selectedIndex = -1;
+
     for (let j = 0; j < available.length; j++) {
       randomValue -= weight(available[j]);
       if (randomValue <= 0) {
@@ -162,14 +163,6 @@ export async function createDraftForRound(
   formation: string,
   liga: Liga
 ): Promise<TempPlantilla> {
-  // Para pruebas, se comenta la validación de fecha:
-  /*
-  const now = new Date();
-  const roundEnd = new Date(round.ending_at);
-  if (now < roundEnd) {
-    throw new Error("No se puede crear el draft: la ronda actual aún no ha finalizado");
-  }
-  */
   // Obtener la siguiente jornada usando getNextJornada
   const nextRound = await getNextJornada();
   if (!nextRound) {
@@ -191,13 +184,14 @@ export async function createDraftForRound(
     if (plantilla.finalized) {
       throw new Error("El draft ya fue finalizado y no se puede editar");
     }
-    
+
     const existingTempData = await sql`
       SELECT "PlayersOptions"
       FROM ${sql(tempPlantillaTable)}
-      WHERE plantilla_id = ${plantilla.id}
+      WHERE id_plantilla = ${plantilla.id}
       LIMIT 1
     `;
+
     if (existingTempData.length > 0) {
       const temp: TempPlantilla = {
         // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -213,17 +207,20 @@ export async function createDraftForRound(
     VALUES (${userId}, ${liga.id}, ${nextRound.id}, ${formation}, false)
     RETURNING *
   `;
+
   if (!plantillaInsert || plantillaInsert.length === 0) {
     throw new Error("Error al crear la plantilla");
   }
-  
+
   const plantilla = plantillaInsert[0];
   const tempPlantilla = await createTempPlantilla(formation);
   tempPlantilla.id_plantilla = plantilla.id;
+
   await sql`
-    INSERT INTO ${sql(tempPlantillaTable)} (plantilla_id, "PlayersOptions")
+    INSERT INTO ${sql(tempPlantillaTable)} (id_plantilla, "PlayersOptions")
     VALUES (${plantilla.id}, ${JSON.stringify(tempPlantilla.playerOptions)})
   `;
+
   return tempPlantilla;
 }
 
