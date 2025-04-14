@@ -378,6 +378,49 @@ const getLigaByIdService = async (id: number): Promise<Liga | undefined> => {
   }
 };
 
+/**
+ * Actualiza el nombre de una liga.
+ * Solo puede hacerlo el capitán de la liga, identificado por el email almacenado en `created_by`.
+ *
+ * @param ligaId - ID de la liga a actualizar.
+ * @param newName - Nuevo nombre para la liga.
+ * @param userEmail - Email del usuario que intenta actualizar la liga.
+ * @returns La liga actualizada.
+ * @throws Error si la liga no existe o si el usuario no es el capitán.
+ */
+const updateLigaNameService = async (
+  ligaId: number,
+  newName: string,
+  userEmail: string
+): Promise<Liga | undefined> => {
+  try {
+    // Buscar la liga por id
+    const liga = await findLigaByIdService(ligaId);
+    if (!liga) {
+      throw new Error('Liga no encontrada');
+    }
+
+    // Verificar que el usuario autenticado es el capitán
+    // En 'created_by' se almacena el correo del usuario que es capitán.
+    if (liga.created_by !== userEmail) {
+      throw new Error('Solo el capitán puede actualizar el nombre de la liga');
+    }
+
+    // Actualizar el nombre de la liga
+    const [updatedLiga] = await sql<Liga[]>`
+      UPDATE ${sql(ligaTable)}
+      SET name = ${newName}
+      WHERE id = ${ligaId}
+      RETURNING id, name, jornada_id, created_by, created_jornada, code
+    `;
+    
+    return updatedLiga ?? null;
+  } catch (error) {
+    console.error('❌ Error actualizando el nombre de la liga:', error);
+    throw new Error('Database error while updating league name');
+  }
+};
+
 export { createLigaService, findLigaByCodeService, addUserToLigaService, getUsersByLigaService,
   isUserInLigaService, getLigaCodeByIdService, removeUserFromLigaService, assignNewCaptainService,
-  abandonLigaService, getUserFromLeagueByIdService, getLigaByIdService };
+  abandonLigaService, getUserFromLeagueByIdService, getLigaByIdService, updateLigaNameService };

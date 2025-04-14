@@ -3,7 +3,7 @@ import { type Request, type Response, type NextFunction } from 'express';
 import { createLigaService, findLigaByCodeService, addUserToLigaService,
   getUsersByLigaService, isUserInLigaService, getLigaCodeByIdService, removeUserFromLigaService,
   assignNewCaptainService, abandonLigaService, getUserFromLeagueByIdService,
-  getLigaByIdService } from '../../services/ligaSupaService.js';
+  getLigaByIdService, updateLigaNameService } from '../../services/ligaSupaService.js';
 import { getCurrentJornada, getJornadaByName } from '../../services/jornadaSupaService.js';
 import type Liga from '../../types/Liga.js';
 import httpStatus from '../config/httpStatusCodes.js';
@@ -77,7 +77,7 @@ const createLiga = async (req: Request, res: Response, next: NextFunction): Prom
     const notification = await createNotificationForUser(notificationMessage, user.id);
 
     // Emisión mediante socket.io (suponiendo que la instancia está en req.app.locals.io).
-    const { io } = req.app.locals as { io?: import("socket.io").Server };
+    const { io } = req.app.locals as { io?: SocketIOServer };
     if (io) {
       io.to(`user_${user.id}`).emit("notification", notification);
     }
@@ -126,7 +126,7 @@ const joinLiga = async (req: Request, res: Response, next: NextFunction): Promis
     const notification = await createNotificationForUser(notificationMessage, user.id);
 
     // Emitir notificación mediante socket.io.
-    const { io } = req.app.locals as { io?: import("socket.io").Server };
+    const { io } = req.app.locals as { io?: SocketIOServer };
     if (io) {
       io.to(`user_${user.id}`).emit("notification", notification);
     }
@@ -261,10 +261,11 @@ const removeUserFromLiga = async (req: Request, res: Response, next: NextFunctio
       res.status(httpStatus.notFound).send({ error: 'Liga no encontrada' });
       return;
     }
+
     const expulsado = await getUserByIdService(userIdToRemove.toString());
 
     // Preparar los mensajes de notificación.
-    const mensajeCapitan = `Has expulsado a ${expulsado.username || expulsado.correo} de la liga ${liga.name}`;
+    const mensajeCapitan = `Has expulsado a ${expulsado.username ?? expulsado.correo} de la liga ${liga.name}`;
     const mensajeExpulsado = `Has sido expulsado de la liga ${liga.name}`;
 
     // Crear las notificaciones en la base de datos.
@@ -406,8 +407,60 @@ const getUserFromLeagueController = async (req: Request, res: Response, next: Ne
   }
 };
 
+/**
+ * Controlador para actualizar el nombre de una liga.
+ * Solo el capitán (identificado por su correo en `created_by`) puede actualizar el nombre.
+ *
+ * Ruta sugerida: PATCH /api/v1/ligas/:ligaId/name
+ *
+ * Ejemplo de body:
+ * {
+ *   "newName": "Nuevo Nombre de Liga"
+ * }
+ */
+const updateLigaNameController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  try {
+    // Verificar autenticación del usuario
+    const user = res.locals.user as { id: number; correo: string };
+    if (!user?.correo) {
+      res.status(httpStatus.unauthorized).json({ error: 'No autorizado' });
+      return;
+    }
+    
+    // Extraer el ID de la liga desde los parámetros de la URL
+    const { ligaId } = req.params;
+    const id = Number(ligaId);
+    if (isNaN(id)) {
+      res.status(httpStatus.badRequest).json({ error: 'ID de liga inválido' });
+      return;
+    }
+    
+    // Extraer el nuevo nombre de la liga desde el body
+    const { newName } = req.body as { newName: string };
+    if (!newName) {
+      res.status(httpStatus.badRequest).json({ error: 'Nuevo nombre no proporcionado' });
+      return;
+    }
+    
+    // Llamar al servicio para actualizar el nombre de la liga.
+    // Este servicio verifica que el usuario sea el capitán comparando el email.
+    const updatedLiga = await updateLigaNameService(id, newName, user.correo);
+    if (!updatedLiga) {
+      res.status(httpStatus.internalServerError).json({ error: 'No se pudo actualizar la liga' });
+      return;
+    }
+    
+    res.status(httpStatus.ok).json({
+      message: 'Liga actualizada correctamente',
+      liga: updatedLiga
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 export { createLiga, joinLiga, getUsersByLiga, getLigaCodeById, removeUserFromLiga,
   assignNewCaptain, abandonLiga, uploadLeagueImageByCaptainController, getLeagueImageController,
-  getUserFromLeagueController };
+  getUserFromLeagueController, updateLigaNameController };
 
 
