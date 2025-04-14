@@ -155,12 +155,24 @@ async function uploadJugadorEquipoSeasonRelation(players: Player[], seasonId: nu
 }
 
 /**
- * Obtiene todos los jugadores desde Supabase.
- * @returns {Promise<Player[]>} Lista de jugadores.
+ * Obtiene todos los jugadores desde Supabase, incluyendo información del equipo (nombre e imagen).
+ * @returns {Promise<any[]>} Lista de jugadores con sus respectivos datos de equipo.
  */
 async function getAllPlayersFromSupabase(): Promise<any[]> {
     try {
-        const players = await sql`SELECT * FROM ${sql(jugadoresTable)}`;
+        const players = await sql`
+            SELECT 
+                j.id, 
+                j."displayName", 
+                j."positionId", 
+                j."imagePath" AS "playerImage",
+                e.id        AS "teamId",
+                e.name      AS "teamName",
+                e."imagePath" AS "teamImage"
+            FROM ${sql(jugadoresTable)} j
+            JOIN ${sql(jugadoresEquipos)} jes ON j.id = jes.jugador_id
+            JOIN ${sql(equiposTable)} e ON e.id = jes.equipo_id
+            `;
         return players;
     } catch (error: any) {
         throw new Error(`Error obteniendo jugadores de Supabase: ${error.message}`);
