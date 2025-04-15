@@ -163,11 +163,24 @@ export async function createDraftForRound(
   formation: string,
   liga: Liga
 ): Promise<TempPlantilla> {
-  // Obtener la siguiente jornada usando getNextJornada
+  const currentRound = await getCurrentJornada();
   const nextRound = await getNextJornada();
-  if (!nextRound) {
-    throw new Error("No se encontró la siguiente jornada para crear el draft");
+
+  if (!currentRound || !nextRound) {
+    throw new Error("No se pudieron obtener las jornadas necesarias para crear el draft");
   }
+
+  /*
+  Aconst now = new Date();
+  const currentEnd = new Date(currentRound.ending_at);
+  const nextStart = new Date(nextRound.starting_at);
+
+  if (now < currentEnd || now >= nextStart) {
+    throw new Error(
+      "Solo se puede crear el draft entre el final de la jornada actual y el inicio de la siguiente"
+    );
+  }
+  */
 
   const existingPlantilla = await sql<Plantilla[]>`
     SELECT *
@@ -193,12 +206,11 @@ export async function createDraftForRound(
     `;
 
     if (existingTempData.length > 0) {
-      const temp: TempPlantilla = {
+      return {
         // eslint-disable-next-line @typescript-eslint/naming-convention
         id_plantilla: plantilla.id,
         playerOptions: existingTempData[0].PlayersOptions as PositionOptions[],
       };
-      return temp;
     }
   }
 
@@ -233,30 +245,50 @@ export async function createDraftForRound(
  * @returns {Promise<void>}
  */
 export async function updateTempPlantilla(
-  plantillaId: number,
-  newData: PositionOptions[]
+  userId: number,
+  ligaId: number,
+  newData: PositionOptions[],
+  roundName?: string
 ): Promise<void> {
+  const currentRound = await getCurrentJornada();
+  const nextRound = await getNextJornada();
+
+  if (!currentRound || !nextRound) {
+    throw new Error("No se pudieron obtener las jornadas para validar el tiempo de edición");
+  }
+
+  /*
+  Aconst now = new Date();
+  const currentEnd = new Date(currentRound.ending_at);
+  const nextStart = new Date(nextRound.starting_at);
+
+  if (now < currentEnd || now >= nextStart) {
+    throw new Error("No puedes editar el draft fuera del rango de edición permitido");
+  }
+  */
+
+  const effectiveRoundName = roundName ?? nextRound.name;
+
+  const [jornadaRecord] = await sql<Round[]>`
+    SELECT id FROM ${sql("jornadaTable")} WHERE name = ${effectiveRoundName} LIMIT 1
+  `;
+  if (!jornadaRecord) throw new Error("No se encontró la jornada con ese nombre");
+
+  const jornadaId = jornadaRecord.id;
+
   const [plantilla] = await sql<Plantilla[]>`
-    SELECT finalized, created_at
-    FROM ${sql(plantillaTable)}
-    WHERE id = ${plantillaId}
+    SELECT id, finalized, usuario_id FROM ${sql(plantillaTable)}
+    WHERE usuario_id = ${userId} AND liga_id = ${ligaId} AND jornada_id = ${jornadaId}
     LIMIT 1
   `;
-  if (plantilla?.finalized) {
-    throw new Error("El draft ya está finalizado y no se puede editar");
-  }
-  // Validación de período de edición (comentada para pruebas)
-  // const creationDate = new Date(plantilla.created_at);
-  // const now = new Date();
-  // const diffHours = (now.getTime() - creationDate.getTime()) / (1000 * 60 * 60);
-  // if (diffHours > 24) {
-  //   throw new Error("El periodo de edición del draft ha finalizado");
-  //
+
+  if (!plantilla) throw new Error("No se encontró la plantilla para ese usuario, liga y jornada");
+  if (plantilla.finalized) throw new Error("El draft ya está finalizado y no se puede editar");
 
   await sql`
     UPDATE ${sql(tempPlantillaTable)}
     SET "PlayersOptions" = ${JSON.stringify(newData)}
-    WHERE plantilla_id = ${plantillaId}
+    WHERE id_plantilla = ${plantilla.id}
   `;
 }
 
@@ -370,38 +402,57 @@ export async function getPlantillaWithPlayers(
  * @param {number} plantillaId - ID de la plantilla.
  * @returns {Promise<TempPlantilla>} - La TempPlantilla asociada al draft.
  */
-export async function getTempDraft(plantillaId: number): Promise<TempPlantilla> {
-  const [plantilla] = await sql<Plantilla[]>`
-    SELECT created_at, finalized
-    FROM ${sql(plantillaTable)}
-    WHERE id = ${plantillaId}
-    LIMIT 1
-  `;
-  if (!plantilla) {
-    throw new Error("No se encontró la plantilla");
-  }
-  // Validación de período de edición (comentada para pruebas)
-  // const creationDate = new Date(plantilla.created_at);
-  // const now = new Date();
-  // const diffHours = (now.getTime() - creationDate.getTime()) / (1000 * 60 * 60);
-  // if (plantilla.finalized || diffHours > 24) {
-  //   throw new Error("El periodo de edición del draft ha finalizado");
-  // }
+export async function getTempDraft(
+  userId: number,
+  ligaId: number,
+  roundName?: string
+): Promise<TempPlantilla> {
+  const currentRound = await getCurrentJornada();
+  const nextRound = await getNextJornada();
 
-  const tempDraftRes = await sql`
-    SELECT "PlayersOptions"
-    FROM ${sql(tempPlantillaTable)}
-    WHERE plantilla_id = ${plantillaId}
+  if (!currentRound || !nextRound) {
+    throw new Error("No se pudieron obtener las jornadas para validar el tiempo de acceso");
+  }
+
+  /*
+  Aconst now = new Date();
+  const currentEnd = new Date(currentRound.ending_at);
+  const nextStart = new Date(nextRound.starting_at);
+
+  if (now < currentEnd || now >= nextStart) {
+    throw new Error("Ya no puedes acceder al borrador: fuera del rango de edición");
+  }
+  */
+
+  const effectiveRoundName = roundName ?? nextRound.name;
+
+  const [jornadaRecord] = await sql<Round[]>`
+    SELECT id FROM ${sql("jornadaTable")} WHERE name = ${effectiveRoundName} LIMIT 1
+  `;
+  if (!jornadaRecord) throw new Error("No se encontró la jornada con ese nombre");
+
+  const jornadaId = jornadaRecord.id;
+
+  const [plantilla] = await sql<Plantilla[]>`
+    SELECT id, finalized FROM ${sql(plantillaTable)}
+    WHERE usuario_id = ${userId} AND liga_id = ${ligaId} AND jornada_id = ${jornadaId}
     LIMIT 1
   `;
-  if (tempDraftRes.length === 0) {
-    throw new Error("No se encontró el borrador asociado a la plantilla");
-  }
-  
-  const tempDraft: TempPlantilla = {
+
+  if (!plantilla) throw new Error("No existe draft creado para estos parámetros");
+  if (plantilla.finalized) throw new Error("Este draft ya fue finalizado y no puede accederse más");
+
+  const [tempDraftRes] = await sql`
+    SELECT "PlayersOptions" FROM ${sql(tempPlantillaTable)}
+    WHERE id_plantilla = ${plantilla.id}
+    LIMIT 1
+  `;
+
+  if (!tempDraftRes) throw new Error("No se encontró el borrador asociado a esta plantilla");
+
+  return {
     // eslint-disable-next-line @typescript-eslint/naming-convention
-    id_plantilla: plantillaId,
-    playerOptions: tempDraftRes[0].PlayersOptions as PositionOptions[],
+    id_plantilla: plantilla.id,
+    playerOptions: tempDraftRes.PlayersOptions as PositionOptions[],
   };
-  return tempDraft;
 }
