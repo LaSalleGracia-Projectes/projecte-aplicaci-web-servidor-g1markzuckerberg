@@ -8,16 +8,16 @@ const draftRouter = Router();
 // Ejemplo: POST /draft/create con body
 draftRouter.post("/create", authMiddleware, createDraftController);
 
-// Ejemplo: PUT /draft/update con body
-draftRouter.put("/update", authMiddleware, updateDraftController);
+// Ejemplo: PUT /draft/update/:ligaId con body
+draftRouter.put("/update/:ligaId", authMiddleware, updateDraftController);
 
 // Ejemplo: POST /draft/saveDraft
 draftRouter.post("/saveDraft", authMiddleware, saveDraftController);
 
-// Ejemplo: GET /draft/getuserDraft?roundName=24
+// Ejemplo: GET /draft/getuserDraft?ligaId=123&roundName=24
 draftRouter.get("/getuserDraft", authMiddleware, getDraftController);
 
-// Ejemplo: GET /draft/tempDraft/:plantillaId
-draftRouter.get("/tempDraft/:plantillaId", authMiddleware, getTempDraftController);
+// Ejemplo: GET /draft/tempDraft/:ligaId
+draftRouter.get("/tempDraft/:ligaId", authMiddleware, getTempDraftController);
 
 export default draftRouter;

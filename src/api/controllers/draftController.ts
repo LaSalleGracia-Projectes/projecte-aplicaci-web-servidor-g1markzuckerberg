@@ -78,13 +78,15 @@ const updateDraftController = async (req: Request, res: Response, next: NextFunc
       return;
     }
 
-    const { plantillaId, playerOptions } = req.body as { plantillaId: number; playerOptions: PositionOptions[] };
-    if (!plantillaId || !playerOptions) {
-      res.status(httpStatus.badRequest).json({ error: 'Faltan parámetros (plantillaId y/o playerOptions)' });
+    const ligaId = Number(req.params.ligaId);
+    const { playerOptions } = req.body as { playerOptions: PositionOptions[] };
+
+    if (!ligaId || !playerOptions) {
+      res.status(httpStatus.badRequest).json({ error: 'Faltan parámetros (ligaId y/o playerOptions)' });
       return;
     }
 
-    await updateTempPlantilla(plantillaId, playerOptions);
+    await updateTempPlantilla(user.id, ligaId, playerOptions);
     res.status(httpStatus.ok).json({ message: 'Draft actualizado correctamente' });
   } catch (error: unknown) {
     next(error);
@@ -141,14 +143,18 @@ const getDraftController = async (req: Request, res: Response, next: NextFunctio
       return;
     }
 
-    const liga = req.query.liga as unknown as Liga;
+    const ligaId = Number(req.query.ligaId);
     const roundName = req.query.roundName as string | undefined;
-    if (!liga?.id) {
-      res.status(httpStatus.badRequest).json({ error: 'Falta parámetro liga' });
+
+    if (!ligaId) {
+      res.status(httpStatus.badRequest).json({ error: 'Falta parámetro ligaId' });
       return;
     }
 
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    const liga: Liga = { id: ligaId, name: '', created_by: '', jornada_id: 0, created_jornada: 0, code: '' };
     const { plantilla, players } = await getPlantillaWithPlayers(user.id, liga, roundName);
+    
     res.status(httpStatus.ok).json({ plantilla, players });
   } catch (error: unknown) {
     next(error);
@@ -173,18 +179,21 @@ const getTempDraftController = async (req: Request, res: Response, next: NextFun
       return;
     }
 
-    const plantillaId = Number(req.params.plantillaId);
-    if (!plantillaId) {
-      res.status(httpStatus.badRequest).json({ error: 'Falta parámetro plantillaId' });
+    const ligaId = Number(req.query.ligaId);
+    const roundName = req.query.roundName as string | undefined;
+
+    if (!ligaId) {
+      res.status(httpStatus.badRequest).json({ error: 'Falta parámetro ligaId' });
       return;
     }
 
-    const tempDraft = await getTempDraft(plantillaId);
+    const tempDraft = await getTempDraft(user.id, ligaId, roundName);
     res.status(httpStatus.ok).json({ tempDraft });
   } catch (error: unknown) {
     next(error);
   }
 };
+
 
 export {
   createDraftController,
