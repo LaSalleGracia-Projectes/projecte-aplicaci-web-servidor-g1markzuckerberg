@@ -182,45 +182,27 @@ export async function createDraftForRound(
   }
   */
 
+  // ⚠️ Si ya existe una plantilla, no dejamos crear otra, sin importar si está finalizada o no
   const existingPlantilla = await sql<Plantilla[]>`
-    SELECT *
-    FROM ${sql(plantillaTable)}
+    SELECT id FROM ${sql(plantillaTable)}
     WHERE usuario_id = ${userId}
       AND liga_id = ${liga.id}
       AND jornada_id = ${nextRound.id}
-      AND formation = ${formation}
     LIMIT 1
   `;
 
   if (existingPlantilla.length > 0) {
-    const plantilla = existingPlantilla[0];
-    if (plantilla.finalized) {
-      throw new Error("El draft ya fue finalizado y no se puede editar");
-    }
-
-    const existingTempData = await sql`
-      SELECT "PlayersOptions"
-      FROM ${sql(tempPlantillaTable)}
-      WHERE id_plantilla = ${plantilla.id}
-      LIMIT 1
-    `;
-
-    if (existingTempData.length > 0) {
-      return {
-        // eslint-disable-next-line @typescript-eslint/naming-convention
-        id_plantilla: plantilla.id,
-        playerOptions: existingTempData[0].PlayersOptions as PositionOptions[],
-      };
-    }
+    throw new Error("Ya existe un draft creado para esta liga y jornada");
   }
 
+  // Si no existe ninguna, procedemos a crearla
   const plantillaInsert = await sql<Plantilla[]>`
     INSERT INTO ${sql(plantillaTable)} (usuario_id, liga_id, jornada_id, formation, finalized)
     VALUES (${userId}, ${liga.id}, ${nextRound.id}, ${formation}, false)
     RETURNING *
   `;
 
-  if (!plantillaInsert || plantillaInsert.length === 0) {
+  if (!plantillaInsert.length) {
     throw new Error("Error al crear la plantilla");
   }
 
@@ -270,7 +252,7 @@ export async function updateTempPlantilla(
   const effectiveRoundName = roundName ?? nextRound.name;
 
   const [jornadaRecord] = await sql<Round[]>`
-    SELECT id FROM ${sql("jornadaTable")} WHERE name = ${effectiveRoundName} LIMIT 1
+    SELECT id FROM ${sql("jornadas")} WHERE name = ${effectiveRoundName} LIMIT 1
   `;
   if (!jornadaRecord) throw new Error("No se encontró la jornada con ese nombre");
 
@@ -363,7 +345,7 @@ export async function getPlantillaWithPlayers(
 
   const [jornadaRecord] = await sql<Round[]>`
     SELECT id
-    FROM ${sql("jornadaTable")}
+    FROM ${sql("jornadas")}
     WHERE name = ${effectiveRoundName}
     LIMIT 1
   `;
@@ -427,7 +409,7 @@ export async function getTempDraft(
   const effectiveRoundName = roundName ?? nextRound.name;
 
   const [jornadaRecord] = await sql<Round[]>`
-    SELECT id FROM ${sql("jornadaTable")} WHERE name = ${effectiveRoundName} LIMIT 1
+    SELECT id FROM ${sql("jornadas")} WHERE name = ${effectiveRoundName} LIMIT 1
   `;
   if (!jornadaRecord) throw new Error("No se encontró la jornada con ese nombre");
 

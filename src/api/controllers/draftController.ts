@@ -179,7 +179,7 @@ const getTempDraftController = async (req: Request, res: Response, next: NextFun
       return;
     }
 
-    const ligaId = Number(req.query.ligaId);
+    const ligaId = Number(req.params.ligaId);
     const roundName = req.query.roundName as string | undefined;
 
     if (!ligaId) {
