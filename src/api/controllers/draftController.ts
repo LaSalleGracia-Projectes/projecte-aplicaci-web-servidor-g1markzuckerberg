@@ -137,24 +137,36 @@ const saveDraftController = async (req: Request, res: Response, next: NextFuncti
  */
 const getDraftController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { user } = res.locals as { user: { id: number } };
-    if (!user?.id) {
-      res.status(httpStatus.unauthorized).json({ error: 'Usuario no autenticado' });
-      return;
-    }
-
     const ligaId = Number(req.query.ligaId);
     const roundName = req.query.roundName as string | undefined;
+    const queryUserId = req.query.userId ? Number(req.query.userId) : undefined; // 👈 nuevo parámetro opcional
 
     if (!ligaId) {
       res.status(httpStatus.badRequest).json({ error: 'Falta parámetro ligaId' });
       return;
     }
 
-    // eslint-disable-next-line @typescript-eslint/naming-convention
-    const liga: Liga = { id: ligaId, name: '', created_by: '', jornada_id: 0, created_jornada: 0, code: '' };
-    const { plantilla, players } = await getPlantillaWithPlayers(user.id, liga, roundName);
-    
+    const effectiveUserId: number = queryUserId ?? (res.locals.user as { id: number }).id;
+
+    if (!effectiveUserId) {
+      res.status(httpStatus.badRequest).json({ error: 'Falta parámetro userId y usuario no autenticado' });
+      return;
+    }
+
+    const liga: Liga = {
+      id: ligaId,
+      name: '',
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      created_by: '',
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      jornada_id: 0,
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      created_jornada: 0,
+      code: '',
+    };
+
+    const { plantilla, players } = await getPlantillaWithPlayers(effectiveUserId, liga, roundName);
+
     res.status(httpStatus.ok).json({ plantilla, players });
   } catch (error: unknown) {
     next(error);

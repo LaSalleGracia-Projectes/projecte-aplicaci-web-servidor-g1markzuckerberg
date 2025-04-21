@@ -14,7 +14,12 @@ draftRouter.put("/update/:ligaId", authMiddleware, updateDraftController);
 // Ejemplo: POST /draft/saveDraft
 draftRouter.post("/saveDraft", authMiddleware, saveDraftController);
 
-// Ejemplo: GET /draft/getuserDraft?ligaId=123&roundName=24
+/* Plantilla del usuario autenticado:
+GET /draft/getuserDraft?ligaId=123
+*/
+/* Plantilla de otro usuario específico:
+GET /draft/getuserDraft?ligaId=123&userId=456
+*/
 draftRouter.get("/getuserDraft", authMiddleware, getDraftController);
 
 // Ejemplo: GET /draft/tempDraft/:ligaId

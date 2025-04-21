@@ -323,38 +323,44 @@ export async function getPlantillaWithPlayers(
   liga: Liga,
   roundName?: string
 ): Promise<{ plantilla: Plantilla; players: Player[] }> {
-  const seasonRes = await sql<Array<{ id: number }>>`
-    SELECT id
-    FROM ${sql("seasons")}
+
+  // 1. Obtiene la temporada actual (última insertada)
+  const [currentSeason] = await sql<Array<{ id: number }>>`
+    SELECT id FROM ${sql("seasons")}
     ORDER BY id DESC
     LIMIT 1
   `;
-  if (seasonRes.length === 0) {
+  if (!currentSeason) {
     throw new Error("No se encontró la temporada actual");
   }
 
-  let effectiveRoundName = roundName;
-  if (!effectiveRoundName) {
-    const currentRound = await getCurrentJornada();
-    if (!currentRound) {
-      throw new Error("No se encontró la jornada actual");
+  // 2. Encuentra la jornada por nombre (si proporcionado) o la jornada actual para esa temporada
+  let jornadaRecord: Round | undefined;
+  
+  if (roundName) {
+    [jornadaRecord] = await sql<Round[]>`
+      SELECT id FROM ${sql("jornadas")}
+      WHERE name = ${roundName} AND season_id = ${currentSeason.id}
+      LIMIT 1
+    `;
+    if (!jornadaRecord) {
+      throw new Error(`No se encontró la jornada "${roundName}" para la temporada actual`);
     }
-
-    effectiveRoundName = currentRound.name;
-  }
-
-  const [jornadaRecord] = await sql<Round[]>`
-    SELECT id
-    FROM ${sql("jornadas")}
-    WHERE name = ${effectiveRoundName}
-    LIMIT 1
-  `;
-  if (!jornadaRecord) {
-    throw new Error("No se encontró la jornada con ese nombre");
+  } else {
+    [jornadaRecord] = await sql<Round[]>`
+      SELECT id FROM ${sql("jornadas")}
+      WHERE is_current = true AND season_id = ${currentSeason.id}
+      LIMIT 1
+    `;
+    if (!jornadaRecord) {
+      throw new Error("No se encontró la jornada actual para la temporada actual");
+    }
   }
 
   const jornadaId = jornadaRecord.id;
-  const plantillaRes = await sql<Plantilla[]>`
+
+  // 3. Busca la plantilla por usuario, liga y jornada identificada
+  const [plantilla] = await sql<Plantilla[]>`
     SELECT *
     FROM ${sql(plantillaTable)}
     WHERE usuario_id = ${userId}
@@ -362,19 +368,22 @@ export async function getPlantillaWithPlayers(
       AND jornada_id = ${jornadaId}
     LIMIT 1
   `;
-  if (plantillaRes.length === 0) {
-    throw new Error("No se encontró el draft para esos parámetros");
+
+  if (!plantilla) {
+    throw new Error("No se encontró la plantilla para esos parámetros");
   }
 
-  const plantilla = plantillaRes[0];
+  // 4. Busca los jugadores relacionados a la plantilla encontrada
   const players = await sql<Player[]>`
     SELECT j.*
     FROM ${sql(plantillaJugadoresTable)} pj
     JOIN ${sql("jugadores")} j ON pj.jugador_id = j.id
     WHERE pj.plantilla_id = ${plantilla.id}
   `;
+
   return { plantilla, players };
 }
+
 
 /**
  * Obtiene la TempPlantilla (borrador) asociada a una plantilla (draft) que aún puede ser editada.
