@@ -357,6 +357,70 @@ const getUserFromLeagueByIdService = async (leagueId: number, userId: number) =>
   }
 };
 
+/**
+ * Obtiene la información de una liga a partir de su ID.
+ * 
+ * @param id - ID de la liga.
+ * @returns La liga encontrada o null si no existe.
+ */
+const getLigaByIdService = async (id: number): Promise<Liga | undefined> => {
+  try {
+    const [liga] = await sql<Liga[]>`
+      SELECT id, name, jornada_id, created_by, created_jornada, code
+      FROM ${sql(ligaTable)}
+      WHERE id = ${id}
+      LIMIT 1
+    `;
+    return liga ?? null;
+  } catch (error: any) {
+    console.error("❌ Error fetching league by id:", error);
+    throw new Error("Database error while fetching league");
+  }
+};
+
+/**
+ * Actualiza el nombre de una liga.
+ * Solo puede hacerlo el capitán de la liga, identificado por el email almacenado en `created_by`.
+ *
+ * @param ligaId - ID de la liga a actualizar.
+ * @param newName - Nuevo nombre para la liga.
+ * @param userEmail - Email del usuario que intenta actualizar la liga.
+ * @returns La liga actualizada.
+ * @throws Error si la liga no existe o si el usuario no es el capitán.
+ */
+const updateLigaNameService = async (
+  ligaId: number,
+  newName: string,
+  userEmail: string
+): Promise<Liga | undefined> => {
+  try {
+    // Buscar la liga por id
+    const liga = await findLigaByIdService(ligaId);
+    if (!liga) {
+      throw new Error('Liga no encontrada');
+    }
+
+    // Verificar que el usuario autenticado es el capitán
+    // En 'created_by' se almacena el correo del usuario que es capitán.
+    if (liga.created_by !== userEmail) {
+      throw new Error('Solo el capitán puede actualizar el nombre de la liga');
+    }
+
+    // Actualizar el nombre de la liga
+    const [updatedLiga] = await sql<Liga[]>`
+      UPDATE ${sql(ligaTable)}
+      SET name = ${newName}
+      WHERE id = ${ligaId}
+      RETURNING id, name, jornada_id, created_by, created_jornada, code
+    `;
+    
+    return updatedLiga ?? null;
+  } catch (error) {
+    console.error('❌ Error actualizando el nombre de la liga:', error);
+    throw new Error('Database error while updating league name');
+  }
+};
+
 export { createLigaService, findLigaByCodeService, addUserToLigaService, getUsersByLigaService,
   isUserInLigaService, getLigaCodeByIdService, removeUserFromLigaService, assignNewCaptainService,
-  abandonLigaService, getUserFromLeagueByIdService };
+  abandonLigaService, getUserFromLeagueByIdService, getLigaByIdService, updateLigaNameService };

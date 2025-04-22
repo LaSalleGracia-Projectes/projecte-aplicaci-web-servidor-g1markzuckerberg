@@ -1,20 +1,25 @@
-import { sql } from "./supabaseService";
-import { plantillaJugadoresTable } from "../models/PlantillaJugadores";
-import { tempPlantillaTable } from "../models/TempPlantilla";
-import { plantillaTable } from "../models/Plantilla";
-import type Plantilla from "../types/Plantilla";
-import PlantillaJugador from "../types/PlantillaJugador";
-import type TempPlantilla from "../types/TempPlantilla";
-import type Player from "../types/Player";
-import type Round from "../types/Round";
-import type { PositionOptions } from "../types/TempPlantilla";
-import { getCurrentJornada } from "./jornadaSupaService";
+import { sql } from "./supabaseService.js";
+import { plantillaJugadoresTable } from "../models/PlantillaJugadores.js";
+import { tempPlantillaTable } from "../models/TempPlantilla.js";
+import { plantillaTable } from "../models/Plantilla.js";
+import type Plantilla from "../types/Plantilla.js";
+import type TempPlantilla from "../types/TempPlantilla.js";
+import type Player from "../types/Player.js";
+import type Round from "../types/Round.js";
+import type Liga from "../types/Liga.js";
+import type { PositionOptions } from "../types/TempPlantilla.js";
+import { getCurrentJornada, getNextJornada } from "./jornadaSupaService.js";
 
 /**
  * Selecciona jugadores aleatoriamente para una posición usando un algoritmo de selección
  * ponderada basado en el campo "estrellas". Los jugadores con 2, 3 y 4 estrellas tienen mayor
  * probabilidad de ser elegidos, mientras que los de 1 y 5 estrellas tienen menor probabilidad.
  * Se excluyen aquellos cuyos IDs ya se hayan seleccionado.
+ *
+ * @param {number} positionId - ID de la posición.
+ * @param {number} limit - Número de jugadores a seleccionar.
+ * @param {number[]} [excludeIds=[]] - IDs de jugadores a excluir.
+ * @returns {Promise<Player[]>} - Array de jugadores seleccionados.
  */
 async function getWeightedRandomPlayersByPosition(
   positionId: number,
@@ -23,15 +28,15 @@ async function getWeightedRandomPlayersByPosition(
 ): Promise<Player[]> {
   const players = await sql<Player[]>`
     SELECT *
-    FROM ${sql('jugadores')}
+    FROM ${sql("jugadores")}
     WHERE "positionId" = ${positionId}
-      AND id NOT IN (${sql(excludeIds)})
+    ${excludeIds.length > 0 ? sql`AND id NOT IN ${sql(excludeIds)}` : sql``}
   `;
-  
+
   if (players.length < limit) {
     throw new Error(`Not enough players available for position ${positionId}`);
   }
-  
+
   function weight(player: Player): number {
     const estrellas = player.estrellas ?? 3;
     if (estrellas === 1 || estrellas === 5) return 1;
@@ -39,15 +44,16 @@ async function getWeightedRandomPlayersByPosition(
     if (estrellas === 3) return 4;
     return 1;
   }
-  
+
   const selected: Player[] = [];
   const available = [...players];
-  
+
   // Selección ponderada sin reemplazo
   for (let i = 0; i < limit; i++) {
     const totalWeight = available.reduce((sum, p) => sum + weight(p), 0);
     let randomValue = Math.random() * totalWeight;
     let selectedIndex = -1;
+
     for (let j = 0; j < available.length; j++) {
       randomValue -= weight(available[j]);
       if (randomValue <= 0) {
@@ -63,12 +69,12 @@ async function getWeightedRandomPlayersByPosition(
     const chosen = available.splice(selectedIndex, 1)[0];
     selected.push(chosen);
   }
-  
+
   return selected;
 }
 
 /**
- * Crea la plantilla temporal (tempPlantilla) en la que se generan las opciones para cada posición.
+ * Crea la plantilla temporal (TempPlantilla) en la que se generan las opciones para cada posición.
  * Cada posición se representa como un tuple de 5 elementos:
  *   [Player, Player, Player, Player, number | undefined]
  * donde el quinto elemento representa el índice elegido (0 a 3) y se inicia como undefined.
@@ -77,6 +83,9 @@ async function getWeightedRandomPlayersByPosition(
  *   - "4-3-3": 3 delanteros, 3 mediocampistas, 4 defensas, 1 portero.
  *   - "4-4-2": 2 delanteros, 4 mediocampistas, 4 defensas, 1 portero.
  *   - "3-4-3": 3 delanteros, 4 mediocampistas, 3 defensas, 1 portero.
+ *
+ * @param {string} formation - Formación elegida.
+ * @returns {Promise<TempPlantilla>} - Objeto TempPlantilla generado.
  */
 export async function createTempPlantilla(formation: string): Promise<TempPlantilla> {
   let counts: { forward: number; midfield: number; defense: number } = { forward: 0, midfield: 0, defense: 0 };
@@ -93,10 +102,10 @@ export async function createTempPlantilla(formation: string): Promise<TempPlanti
     default:
       throw new Error("Formation not supported");
   }
-  
+
   const goalkeeperCount = 1; // Siempre 1 portero
   const selectedIds: number[] = [];
-  
+
   async function getOptionsForPosition(positionId: number, count: number): Promise<PositionOptions[]> {
     const options: PositionOptions[] = [];
     for (let i = 0; i < count; i++) {
@@ -113,141 +122,165 @@ export async function createTempPlantilla(formation: string): Promise<TempPlanti
 
     return options;
   }
-  
+
   const forwardOptions = await getOptionsForPosition(27, counts.forward);
   const midfieldOptions = await getOptionsForPosition(26, counts.midfield);
   const defenseOptions = await getOptionsForPosition(25, counts.defense);
   const goalkeeperOptions = await getOptionsForPosition(24, goalkeeperCount);
-  
+
   const playerOptions: PositionOptions[] = [
     ...forwardOptions,
     ...midfieldOptions,
     ...defenseOptions,
     ...goalkeeperOptions,
   ];
-  
+
   const tempPlantilla: TempPlantilla = {
     // eslint-disable-next-line @typescript-eslint/naming-convention
-    id_plantilla: 0, // Valor provisional; se actualizará al crear la plantilla en la BD
+    id_plantilla: 0,
     playerOptions,
   };
-  
+
   return tempPlantilla;
 }
 
 /**
- * Crea el draft para una ronda. Valida que la fecha actual sea posterior a round.ending_at para permitir la creación.
- * Además, verifica si ya existe una plantilla para ese equipo, temporada y draft (basado en el draftName).
- * Si existe y no está finalizada, retorna la tempPlantilla existente para actualización.
- * Si no existe, crea la plantilla en la tabla 'plantilla', genera la tempPlantilla y la guarda en la tabla 'tempPlantilla'.
+ * Crea el draft para una ronda (para la siguiente jornada).
+ * Se verifica (comentado para pruebas) que la fecha actual sea posterior a round.ending_at.
+ * Además, se verifica si ya existe una plantilla para ese usuario, liga y jornada; si existe y no está finalizada,
+ * retorna la TempPlantilla existente para actualización. Si no existe, crea la plantilla en la tabla 'plantilla',
+ * genera la TempPlantilla y la guarda en la tabla 'tempPlantilla'.
  *
- * Sólo se puede crear un draft único por equipo y ronda.
+ * Sólo se puede crear un draft único por usuario, liga y jornada.
  *
- * @param teamId - ID del equipo que crea el draft.
- * @param formation - Formación elegida ("4-3-3", "4-4-2", "3-4-3").
- * @param round - Objeto Round con la información de la ronda.
- * @returns La tempPlantilla generada.
+ * @param {number} userId - ID del usuario que crea el draft.
+ * @param {string} formation - Formación elegida ("4-3-3", "4-4-2", "3-4-3").
+ * @param {Liga} liga - Objeto Liga; se utiliza liga.id para el draft.
+ * @returns {Promise<TempPlantilla>} - La TempPlantilla generada.
  */
 export async function createDraftForRound(
-  teamId: number,
+  userId: number,
   formation: string,
-  round: Round
+  liga: Liga
 ): Promise<TempPlantilla> {
-  const now = new Date();
-  const roundEnd = new Date(round.ending_at);
-  
-  if (now < roundEnd) {
-    throw new Error("No se puede crear el draft: la ronda actual aún no ha finalizado");
+  const currentRound = await getCurrentJornada();
+  const nextRound = await getNextJornada();
+
+  if (!currentRound || !nextRound) {
+    throw new Error("No se pudieron obtener las jornadas necesarias para crear el draft");
   }
-  
-  const draftName = "Draft para ronda " + round.name;
-  
+
+  /*
+  Aconst now = new Date();
+  const currentEnd = new Date(currentRound.ending_at);
+  const nextStart = new Date(nextRound.starting_at);
+
+  if (now < currentEnd || now >= nextStart) {
+    throw new Error(
+      "Solo se puede crear el draft entre el final de la jornada actual y el inicio de la siguiente"
+    );
+  }
+  */
+
+  // ⚠️ Si ya existe una plantilla, no dejamos crear otra, sin importar si está finalizada o no
   const existingPlantilla = await sql<Plantilla[]>`
-    SELECT *
-    FROM ${sql(plantillaTable)}
-    WHERE "teamId" = ${teamId} AND "seasonId" = ${round.season_id} AND name = ${draftName}
+    SELECT id FROM ${sql(plantillaTable)}
+    WHERE usuario_id = ${userId}
+      AND liga_id = ${liga.id}
+      AND jornada_id = ${nextRound.id}
     LIMIT 1
   `;
-  
+
   if (existingPlantilla.length > 0) {
-    const plantilla = existingPlantilla[0];
-    if (plantilla.finalized) {
-      throw new Error("El draft ya fue finalizado y no se puede editar");
-    }
-    
-    const existingTempData = await sql`
-      SELECT data
-      FROM ${sql(tempPlantillaTable)}
-      WHERE plantilla_id = ${plantilla.id}
-      LIMIT 1
-    `;
-    if (existingTempData.length > 0) {
-      const temp: TempPlantilla = {
-        // eslint-disable-next-line @typescript-eslint/naming-convention
-        id_plantilla: plantilla.id,
-        playerOptions: existingTempData[0].data as PositionOptions[],
-      };
-      return temp;
-    }
+    throw new Error("Ya existe un draft creado para esta liga y jornada");
   }
-  
+
+  // Si no existe ninguna, procedemos a crearla
   const plantillaInsert = await sql<Plantilla[]>`
-    INSERT INTO ${sql(plantillaTable)} ("teamId", "seasonId", name, finalized)
-    VALUES (${teamId}, ${round.season_id}, ${draftName}, false)
+    INSERT INTO ${sql(plantillaTable)} (usuario_id, liga_id, jornada_id, formation, finalized)
+    VALUES (${userId}, ${liga.id}, ${nextRound.id}, ${formation}, false)
     RETURNING *
   `;
-  
-  if (!plantillaInsert || plantillaInsert.length === 0) {
+
+  if (!plantillaInsert.length) {
     throw new Error("Error al crear la plantilla");
   }
-  
+
   const plantilla = plantillaInsert[0];
   const tempPlantilla = await createTempPlantilla(formation);
   tempPlantilla.id_plantilla = plantilla.id;
-  
+
   await sql`
-    INSERT INTO ${sql(tempPlantillaTable)} ("plantilla_id", data)
+    INSERT INTO ${sql(tempPlantillaTable)} (id_plantilla, "PlayersOptions")
     VALUES (${plantilla.id}, ${JSON.stringify(tempPlantilla.playerOptions)})
   `;
-  
+
   return tempPlantilla;
 }
 
 /**
- * Actualiza el JSON de la tempPlantilla (por ejemplo, cuando se modifica el "chosen" en alguna posición).
- * Sólo se permite la actualización si la plantilla (draft) aún no está finalizada.
+ * Actualiza el JSON de la TempPlantilla (por ejemplo, cuando se modifica el "chosen" en alguna posición).
+ * Solo se permite la actualización si la plantilla (draft) aún no está finalizada y dentro del período de edición.
  *
- * @param plantillaId - ID de la plantilla.
- * @param newData - Nuevo array de PositionOptions para la tempPlantilla.
+ * @param {number} plantillaId - ID de la plantilla.
+ * @param {PositionOptions[]} newData - Nuevo array de PositionOptions para la TempPlantilla.
+ * @returns {Promise<void>}
  */
 export async function updateTempPlantilla(
-  plantillaId: number,
-  newData: PositionOptions[]
+  userId: number,
+  ligaId: number,
+  newData: PositionOptions[],
+  roundName?: string
 ): Promise<void> {
+  const currentRound = await getCurrentJornada();
+  const nextRound = await getNextJornada();
+
+  if (!currentRound || !nextRound) {
+    throw new Error("No se pudieron obtener las jornadas para validar el tiempo de edición");
+  }
+
+  /*
+  Aconst now = new Date();
+  const currentEnd = new Date(currentRound.ending_at);
+  const nextStart = new Date(nextRound.starting_at);
+
+  if (now < currentEnd || now >= nextStart) {
+    throw new Error("No puedes editar el draft fuera del rango de edición permitido");
+  }
+  */
+
+  const effectiveRoundName = roundName ?? nextRound.name;
+
+  const [jornadaRecord] = await sql<Round[]>`
+    SELECT id FROM ${sql("jornadas")} WHERE name = ${effectiveRoundName} LIMIT 1
+  `;
+  if (!jornadaRecord) throw new Error("No se encontró la jornada con ese nombre");
+
+  const jornadaId = jornadaRecord.id;
+
   const [plantilla] = await sql<Plantilla[]>`
-    SELECT finalized
-    FROM ${sql(plantillaTable)}
-    WHERE id = ${plantillaId}
+    SELECT id, finalized, usuario_id FROM ${sql(plantillaTable)}
+    WHERE usuario_id = ${userId} AND liga_id = ${ligaId} AND jornada_id = ${jornadaId}
     LIMIT 1
   `;
-  
-  if (plantilla?.finalized) {
-    throw new Error("El draft ya está finalizado y no se puede editar");
-  }
-  
+
+  if (!plantilla) throw new Error("No se encontró la plantilla para ese usuario, liga y jornada");
+  if (plantilla.finalized) throw new Error("El draft ya está finalizado y no se puede editar");
+
   await sql`
     UPDATE ${sql(tempPlantillaTable)}
-    SET data = ${JSON.stringify(newData)}
-    WHERE plantilla_id = ${plantillaId}
+    SET "PlayersOptions" = ${JSON.stringify(newData)}
+    WHERE id_plantilla = ${plantilla.id}
   `;
 }
 
 /**
  * Guarda la selección final del draft en la tabla 'plantilla_jugadores'.
- * Recorre cada grupo de opciones en la tempPlantilla y, usando el índice elegido (quinto elemento),
+ * Recorre cada grupo de opciones en la TempPlantilla y, usando el índice elegido (quinto elemento),
  * inserta la relación (plantilla_id, jugador_id). Luego, marca la plantilla como finalizada.
  *
- * @param tempDraft - La TempPlantilla final, en la cual cada PositionOptions tiene un valor numérico definido en el quinto elemento.
+ * @param {TempPlantilla} tempDraft - La TempPlantilla final, donde cada PositionOptions tiene un valor numérico definido en el quinto elemento.
+ * @returns {Promise<void>}
  */
 export async function saveDraftSelection(tempDraft: TempPlantilla): Promise<void> {
   const insertPromises = tempDraft.playerOptions.map(async options => {
@@ -260,16 +293,14 @@ export async function saveDraftSelection(tempDraft: TempPlantilla): Promise<void
     if (typeof selectedPlayer === "number" || !selectedPlayer || !("id" in selectedPlayer)) {
       return Promise.reject(new Error("Invalid player selection: expected a Player object with an id property"));
     }
-    
+
     return sql`
-      INSERT INTO ${sql(plantillaJugadoresTable)} ("plantilla_id", "jugador_id")
+      INSERT INTO ${sql(plantillaJugadoresTable)} (plantilla_id, jugador_id)
       VALUES (${tempDraft.id_plantilla}, ${selectedPlayer.id})
       ON CONFLICT DO NOTHING
     `;
   });
-  
   await Promise.all(insertPromises);
-  
   await sql`
     UPDATE ${sql(plantillaTable)}
     SET finalized = true
@@ -277,67 +308,142 @@ export async function saveDraftSelection(tempDraft: TempPlantilla): Promise<void
   `;
 }
 
-
 /**
  * Obtiene la plantilla (draft) final y sus jugadores ya guardados en la relación.
- * Se busca usando el draftName "Draft para ronda " + roundName; si roundName no se proporciona,
- * se usa la jornada actual (obtenida por getCurrentJornada).
+ * Se busca usando la jornada actual o, si se proporciona roundName, se utiliza ese valor para determinar la jornada.
  * La temporada actual se obtiene directamente mediante una consulta SQL (la última insertada en "seasons").
  *
- * @param teamId - ID del equipo.
- * @param roundName - (Opcional) Nombre de la ronda.
- * @returns Objeto con la plantilla y un array de jugadores.
+ * @param {number} userId - ID del usuario.
+ * @param {Liga} liga - Objeto Liga, de donde se toma liga.id.
+ * @param {string} [roundName] - (Opcional) Nombre de la jornada.
+ * @returns {Promise<{ plantilla: Plantilla; players: Player[] }>} - Objeto con la plantilla y un array de jugadores.
  */
 export async function getPlantillaWithPlayers(
-  teamId: number,
+  userId: number,
+  liga: Liga,
   roundName?: string
 ): Promise<{ plantilla: Plantilla; players: Player[] }> {
-  // Obtener la temporada actual directamente con SQL (la última insertada en "seasons")
-  const seasonRes = await sql<Array<{ id: number }>>`
-    SELECT id
-    FROM ${sql('seasons')}
+
+  // 1. Obtiene la temporada actual (última insertada)
+  const [currentSeason] = await sql<Array<{ id: number }>>`
+    SELECT id FROM ${sql("seasons")}
     ORDER BY id DESC
     LIMIT 1
   `;
-  if (seasonRes.length === 0) {
+  if (!currentSeason) {
     throw new Error("No se encontró la temporada actual");
   }
 
-  const seasonId = seasonRes[0].id;
-
-  let effectiveRoundName = roundName;
-  if (!effectiveRoundName) {
-    const currentRound = await getCurrentJornada();
-    if (!currentRound) {
-      throw new Error("No se encontró la jornada actual");
+  // 2. Encuentra la jornada por nombre (si proporcionado) o la jornada actual para esa temporada
+  let jornadaRecord: Round | undefined;
+  
+  if (roundName) {
+    [jornadaRecord] = await sql<Round[]>`
+      SELECT id FROM ${sql("jornadas")}
+      WHERE name = ${roundName} AND season_id = ${currentSeason.id}
+      LIMIT 1
+    `;
+    if (!jornadaRecord) {
+      throw new Error(`No se encontró la jornada "${roundName}" para la temporada actual`);
     }
-    
-    effectiveRoundName = currentRound.name;
+  } else {
+    [jornadaRecord] = await sql<Round[]>`
+      SELECT id FROM ${sql("jornadas")}
+      WHERE is_current = true AND season_id = ${currentSeason.id}
+      LIMIT 1
+    `;
+    if (!jornadaRecord) {
+      throw new Error("No se encontró la jornada actual para la temporada actual");
+    }
   }
-  
-  const draftName = "Draft para ronda " + effectiveRoundName;
-  
-  const plantillaRes = await sql<Plantilla[]>`
+
+  const jornadaId = jornadaRecord.id;
+
+  // 3. Busca la plantilla por usuario, liga y jornada identificada
+  const [plantilla] = await sql<Plantilla[]>`
     SELECT *
     FROM ${sql(plantillaTable)}
-    WHERE "teamId" = ${teamId}
-      AND "seasonId" = ${seasonId}
-      AND name = ${draftName}
+    WHERE usuario_id = ${userId}
+      AND liga_id = ${liga.id}
+      AND jornada_id = ${jornadaId}
     LIMIT 1
   `;
-  
-  if (plantillaRes.length === 0) {
-    throw new Error("No se encontró el draft para esos parámetros");
+
+  if (!plantilla) {
+    throw new Error("No se encontró la plantilla para esos parámetros");
   }
-  
-  const plantilla = plantillaRes[0];
-  
+
+  // 4. Busca los jugadores relacionados a la plantilla encontrada
   const players = await sql<Player[]>`
     SELECT j.*
     FROM ${sql(plantillaJugadoresTable)} pj
-    JOIN ${sql('jugadores')} j ON pj.jugador_id = j.id
+    JOIN ${sql("jugadores")} j ON pj.jugador_id = j.id
     WHERE pj.plantilla_id = ${plantilla.id}
   `;
-  
+
   return { plantilla, players };
+}
+
+
+/**
+ * Obtiene la TempPlantilla (borrador) asociada a una plantilla (draft) que aún puede ser editada.
+ * Se recupera la plantilla por su ID y se valida que se encuentre dentro del período de edición.
+ * Se utiliza el campo "PlayersOptions" de la tabla TempPlantilla.
+ *
+ * @param {number} plantillaId - ID de la plantilla.
+ * @returns {Promise<TempPlantilla>} - La TempPlantilla asociada al draft.
+ */
+export async function getTempDraft(
+  userId: number,
+  ligaId: number,
+  roundName?: string
+): Promise<TempPlantilla> {
+  const currentRound = await getCurrentJornada();
+  const nextRound = await getNextJornada();
+
+  if (!currentRound || !nextRound) {
+    throw new Error("No se pudieron obtener las jornadas para validar el tiempo de acceso");
+  }
+
+  /*
+  Aconst now = new Date();
+  const currentEnd = new Date(currentRound.ending_at);
+  const nextStart = new Date(nextRound.starting_at);
+
+  if (now < currentEnd || now >= nextStart) {
+    throw new Error("Ya no puedes acceder al borrador: fuera del rango de edición");
+  }
+  */
+
+  const effectiveRoundName = roundName ?? nextRound.name;
+
+  const [jornadaRecord] = await sql<Round[]>`
+    SELECT id FROM ${sql("jornadas")} WHERE name = ${effectiveRoundName} LIMIT 1
+  `;
+  if (!jornadaRecord) throw new Error("No se encontró la jornada con ese nombre");
+
+  const jornadaId = jornadaRecord.id;
+
+  const [plantilla] = await sql<Plantilla[]>`
+    SELECT id, finalized FROM ${sql(plantillaTable)}
+    WHERE usuario_id = ${userId} AND liga_id = ${ligaId} AND jornada_id = ${jornadaId}
+    LIMIT 1
+  `;
+
+  if (!plantilla) throw new Error("No existe draft creado para estos parámetros");
+  if (plantilla.finalized) throw new Error("Este draft ya fue finalizado y no puede accederse más");
+
+  const [tempDraftRes] = await sql`
+    SELECT "PlayersOptions" FROM ${sql(tempPlantillaTable)}
+    WHERE id_plantilla = ${plantilla.id}
+    LIMIT 1
+  `;
+
+  if (!tempDraftRes) throw new Error("No se encontró el borrador asociado a esta plantilla");
+
+  return {
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    id_plantilla: plantilla.id,
+    playerOptions: tempDraftRes.PlayersOptions as PositionOptions[],
+  };
 }

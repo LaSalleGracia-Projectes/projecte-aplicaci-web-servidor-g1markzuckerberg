@@ -1,73 +1,94 @@
-import { type Model, type Document, type ProjectionFields } from 'mongoose';
+import { type Document } from 'mongoose';
+import type ContactForm from '../types/ContactFormMongo.js';
+import type UserI from '../types/UserI.js';
+import contactFormModel from '../models/ContactFormSchema.js';
 
-const findOne = async <T, Doctype>(model: Model<T>, query: Record<string, any>, projection: ProjectionFields<Doctype>) => {
+/**
+ * Crea un nuevo formulario de contacto.
+ * Esta operación es pública, ya que el correo se obtiene desde res.locals y el usuario ingresa el mensaje.
+ *
+ * @param correo - Correo del usuario, obtenido de res.locals.
+ * @param mensaje - Mensaje escrito por el usuario.
+ * @returns El formulario de contacto guardado en la base de datos.
+ */
+const createContactForm = async (
+  correo: string,
+  mensaje: string
+): Promise<ContactForm & Document> => {
   try {
-    return await model.findOne(query, { ...projection, __v: 0 });
-  } catch (error) {
-    throw new Error(error instanceof Error ? error.message : String(error));
-  }
-}
-
-const findById = async <T, Doctype>(model: Model<T>, id: string, projection: ProjectionFields<Doctype>) => {
-  try {
-    return await model.findById(id, { ...projection, __v: 0 });
-  } catch (error) {
-    throw new Error(error instanceof Error ? error.message : String(error));
-  }
-}
-
-const findAll = async <T, Doctype>(model: Model<T>, projection: ProjectionFields<Doctype>, pagination: { skip: number, limit: number }) => {
-  try {
-    return (await model.find({}, { ...projection, __v: 0 }, pagination).sort({ name: 1 }));
-  } catch (error) {
-    throw new Error(error instanceof Error ? error.message : String(error));
-  }
-}
-
-const findAllCities = async <T, Doctype>(
-  model: Model<T>,
-  projection: ProjectionFields<Doctype>,
-  pagination: { skip: number, limit: number },
-  filter: Record<string, unknown> = {} // Filtro por defecto vacío si no se proporciona ninguno
-) => {
-  try {
-    // Incluir el filtro en la llamada a 'find'.
-    return await model.find(filter, { ...projection, __v: 0 }, { skip: pagination.skip, limit: pagination.limit })
-                      .sort({ name: 1 })
-                      .exec();  // Asegúrate de llamar a .exec() para obtener una promesa propiamente.
-  } catch (error) {
-    console.error('Error fetching data:', error); // Buenas prácticas: registrar el error para depuración.
-    throw new Error(error instanceof Error ? error.message : String(error));
-  }
-}
-
-const create = async <T>(objToCreate: Document<T>) => {
-  try {
-    return await objToCreate.save();
-  } catch (error) {
-    throw new Error(error instanceof Error ? error.message : String(error));
-  }
-}
-
-const update = async <T, Doctype>(model: Model<T>, objToUpdate: Document<T>,  projection: ProjectionFields<Doctype>) => {
-  try {
-    return await model.findOneAndUpdate({ _id: objToUpdate._id }, { $set: objToUpdate }, {
-      projection: { ...projection, __v: 0 },
-      new: true,
+    // eslint-disable-next-line new-cap
+    const newContactForm = new contactFormModel({
+      correo,
+      mensaje,
+      resolved: false
     });
+    return await newContactForm.save();
   } catch (error) {
     throw new Error(error instanceof Error ? error.message : String(error));
   }
-}
+};
 
-const remove = async <T, Doctype>(model: Model<T>, id: string, projection: ProjectionFields<Doctype>) => {
+/**
+ * Obtiene todos los formularios de contacto.
+ * Esta operación solo puede realizarse por un usuario administrador.
+ *
+ * @param user - Objeto usuario obtenido de res.locals (debe tener is_admin true).
+ * @returns Lista de formularios de contacto ordenados desde el más reciente al más antiguo.
+ */
+const getAllContactForms = async (
+  user: UserI
+): Promise<Array<ContactForm & Document>> => {
+  if (!user.is_admin) {
+    throw new Error('No autorizado: Solo administradores pueden obtener todos los formularios.');
+  }
+
   try {
-    return await model.findOneAndDelete({ _id: id }, {
-      projection:  { ...projection, __v: 0 }
-    });
+    return await contactFormModel.find({}).sort({ createdAt: -1 });
   } catch (error) {
     throw new Error(error instanceof Error ? error.message : String(error));
   }
-}
+};
 
-export { findOne, findById, findAll, create, update, remove, findAllCities };
+/**
+ * Actualiza el campo "resolved" de un formulario de contacto.
+ * Esta operación solo puede realizarla un administrador y únicamente se permite actualizar el campo "resolved".
+ *
+ * @param user - Objeto usuario obtenido de res.locals (debe tener is_admin true).
+ * @param id - Identificador del formulario a actualizar.
+ * @param updateData - Objeto con el campo "resolved" a actualizar (ejemplo: { resolved: true }).
+ * @returns El formulario de contacto actualizado o null en caso de no encontrarlo.
+ */
+const updateContactForm = async (
+  user: UserI,
+  id: string,
+  updateData: Partial<ContactForm>
+): Promise<(ContactForm & Document) | undefined> => {
+  if (!user.is_admin) {
+    throw new Error('No autorizado: Solo administradores pueden actualizar formularios.');
+  }
+
+  // Validar que únicamente se actualice el campo "resolved"
+  const allowedKeys = ['resolved'];
+  const updateKeys = Object.keys(updateData);
+  if (updateKeys.length === 0) {
+    throw new Error('Debe incluir al menos el campo "resolved" para actualizar.');
+  }
+
+  const invalidKeys = updateKeys.filter(key => !allowedKeys.includes(key));
+  if (invalidKeys.length > 0) {
+    throw new Error('Solo se permite actualizar el campo "resolved".');
+  }
+
+  try {
+    const updatedForm = await contactFormModel.findByIdAndUpdate(
+      id,
+      { $set: updateData },
+      { new: true }
+    );
+    return updatedForm ?? undefined;
+  } catch (error) {
+    throw new Error(error instanceof Error ? error.message : String(error));
+  }
+};
+
+export { createContactForm, getAllContactForms, updateContactForm };
