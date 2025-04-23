@@ -322,7 +322,10 @@ export async function getPlantillaWithPlayers(
   userId: number,
   liga: Liga,
   roundName?: string
-): Promise<{ plantilla: Plantilla; players: Player[] }> {
+): Promise<{
+  plantilla: Plantilla;
+  players: Array<Player & { puntos_jornada: number }>;
+}> {
 
   // 1. Obtiene la temporada actual (última insertada)
   const [currentSeason] = await sql<Array<{ id: number }>>`
@@ -334,13 +337,14 @@ export async function getPlantillaWithPlayers(
     throw new Error("No se encontró la temporada actual");
   }
 
-  // 2. Encuentra la jornada por nombre (si proporcionado) o la jornada actual para esa temporada
+  // 2. Determina la jornada a usar: por nombre o la actual
   let jornadaRecord: Round | undefined;
-  
   if (roundName) {
     [jornadaRecord] = await sql<Round[]>`
-      SELECT id FROM ${sql("jornadas")}
-      WHERE name = ${roundName} AND season_id = ${currentSeason.id}
+      SELECT id 
+      FROM ${sql("jornadas")}
+      WHERE name = ${roundName}
+        AND season_id = ${currentSeason.id}
       LIMIT 1
     `;
     if (!jornadaRecord) {
@@ -348,8 +352,10 @@ export async function getPlantillaWithPlayers(
     }
   } else {
     [jornadaRecord] = await sql<Round[]>`
-      SELECT id FROM ${sql("jornadas")}
-      WHERE is_current = true AND season_id = ${currentSeason.id}
+      SELECT id
+      FROM ${sql("jornadas")}
+      WHERE is_current = true
+        AND season_id = ${currentSeason.id}
       LIMIT 1
     `;
     if (!jornadaRecord) {
@@ -359,25 +365,30 @@ export async function getPlantillaWithPlayers(
 
   const jornadaId = jornadaRecord.id;
 
-  // 3. Busca la plantilla por usuario, liga y jornada identificada
+  // 3. Busca la plantilla para ese usuario, liga y jornada
   const [plantilla] = await sql<Plantilla[]>`
     SELECT *
     FROM ${sql(plantillaTable)}
-    WHERE usuario_id = ${userId}
-      AND liga_id = ${liga.id}
-      AND jornada_id = ${jornadaId}
+    WHERE usuario_id  = ${userId}
+      AND liga_id      = ${liga.id}
+      AND jornada_id  = ${jornadaId}
     LIMIT 1
   `;
-
   if (!plantilla) {
     throw new Error("No se encontró la plantilla para esos parámetros");
   }
 
-  // 4. Busca los jugadores relacionados a la plantilla encontrada
-  const players = await sql<Player[]>`
-    SELECT j.*
+  // 4. Busca los jugadores y añade puntos de esa jornada
+  const players = await sql<Array<Player & { puntos_jornada: number }>>`
+    SELECT
+      j.*,
+      COALESCE(jj.points, 0)::int AS puntos_jornada
     FROM ${sql(plantillaJugadoresTable)} pj
-    JOIN ${sql("jugadores")} j ON pj.jugador_id = j.id
+    JOIN ${sql("jugadores")} j
+      ON pj.jugador_id = j.id
+    LEFT JOIN ${sql("jornada_jugador")} jj
+      ON jj.jugador_id = j.id
+      AND jj.jornada_id  = ${jornadaId}
     WHERE pj.plantilla_id = ${plantilla.id}
   `;
 
