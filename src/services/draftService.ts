@@ -170,8 +170,7 @@ export async function createDraftForRound(
     throw new Error("No se pudieron obtener las jornadas necesarias para crear el draft");
   }
 
-  /*
-  Aconst now = new Date();
+  const now = new Date();
   const currentEnd = new Date(currentRound.ending_at);
   const nextStart = new Date(nextRound.starting_at);
 
@@ -180,7 +179,6 @@ export async function createDraftForRound(
       "Solo se puede crear el draft entre el final de la jornada actual y el inicio de la siguiente"
     );
   }
-  */
 
   // ⚠️ Si ya existe una plantilla, no dejamos crear otra, sin importar si está finalizada o no
   const existingPlantilla = await sql<Plantilla[]>`
@@ -239,15 +237,13 @@ export async function updateTempPlantilla(
     throw new Error("No se pudieron obtener las jornadas para validar el tiempo de edición");
   }
 
-  /*
-  Aconst now = new Date();
+  const now = new Date();
   const currentEnd = new Date(currentRound.ending_at);
   const nextStart = new Date(nextRound.starting_at);
 
   if (now < currentEnd || now >= nextStart) {
     throw new Error("No puedes editar el draft fuera del rango de edición permitido");
   }
-  */
 
   const effectiveRoundName = roundName ?? nextRound.name;
 
@@ -322,7 +318,10 @@ export async function getPlantillaWithPlayers(
   userId: number,
   liga: Liga,
   roundName?: string
-): Promise<{ plantilla: Plantilla; players: Player[] }> {
+): Promise<{
+  plantilla: Plantilla;
+  players: Array<Player & { puntos_jornada: number }>;
+}> {
 
   // 1. Obtiene la temporada actual (última insertada)
   const [currentSeason] = await sql<Array<{ id: number }>>`
@@ -334,13 +333,14 @@ export async function getPlantillaWithPlayers(
     throw new Error("No se encontró la temporada actual");
   }
 
-  // 2. Encuentra la jornada por nombre (si proporcionado) o la jornada actual para esa temporada
+  // 2. Encuentra la jornada por nombre (si proporcionado) o la jornada actual
   let jornadaRecord: Round | undefined;
-  
   if (roundName) {
     [jornadaRecord] = await sql<Round[]>`
-      SELECT id FROM ${sql("jornadas")}
-      WHERE name = ${roundName} AND season_id = ${currentSeason.id}
+      SELECT id
+      FROM ${sql("jornadas")}
+      WHERE name = ${roundName}
+        AND season_id = ${currentSeason.id}
       LIMIT 1
     `;
     if (!jornadaRecord) {
@@ -348,8 +348,10 @@ export async function getPlantillaWithPlayers(
     }
   } else {
     [jornadaRecord] = await sql<Round[]>`
-      SELECT id FROM ${sql("jornadas")}
-      WHERE is_current = true AND season_id = ${currentSeason.id}
+      SELECT id
+      FROM ${sql("jornadas")}
+      WHERE is_current = true
+        AND season_id = ${currentSeason.id}
       LIMIT 1
     `;
     if (!jornadaRecord) {
@@ -359,31 +361,50 @@ export async function getPlantillaWithPlayers(
 
   const jornadaId = jornadaRecord.id;
 
-  // 3. Busca la plantilla por usuario, liga y jornada identificada
+  // 3. Busca la plantilla por usuario, liga y jornada
   const [plantilla] = await sql<Plantilla[]>`
     SELECT *
     FROM ${sql(plantillaTable)}
-    WHERE usuario_id = ${userId}
-      AND liga_id = ${liga.id}
-      AND jornada_id = ${jornadaId}
+    WHERE usuario_id  = ${userId}
+      AND liga_id      = ${liga.id}
+      AND jornada_id   = ${jornadaId}
     LIMIT 1
   `;
-
   if (!plantilla) {
     throw new Error("No se encontró la plantilla para esos parámetros");
   }
 
-  // 4. Busca los jugadores relacionados a la plantilla encontrada
-  const players = await sql<Player[]>`
+  // 4. Carga los jugadores de esa plantilla
+  const jugadores = await sql<Player[]>`
     SELECT j.*
     FROM ${sql(plantillaJugadoresTable)} pj
-    JOIN ${sql("jugadores")} j ON pj.jugador_id = j.id
+    JOIN ${sql("jugadores")} j
+      ON pj.jugador_id = j.id
     WHERE pj.plantilla_id = ${plantilla.id}
   `;
 
+  // 5. Por cada jugador, consulta sus puntos en la jornadaId y los añade
+  const players = await Promise.all(
+    jugadores.map(async (player) => {
+      const [{ puntos = 0 }] = await sql<
+        Array<{ puntos: number }>
+      >`
+        SELECT COALESCE(points, 0) AS puntos
+        FROM ${sql("jornada_jugador")}
+        WHERE jugador_id = ${player.id}
+          AND jornada_id = ${jornadaId}
+        LIMIT 1
+      `;
+      return {
+        ...player,
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        puntos_jornada: puntos,
+      };
+    })
+  );
+
   return { plantilla, players };
 }
-
 
 /**
  * Obtiene la TempPlantilla (borrador) asociada a una plantilla (draft) que aún puede ser editada.
@@ -405,15 +426,13 @@ export async function getTempDraft(
     throw new Error("No se pudieron obtener las jornadas para validar el tiempo de acceso");
   }
 
-  /*
-  Aconst now = new Date();
+  const now = new Date();
   const currentEnd = new Date(currentRound.ending_at);
   const nextStart = new Date(nextRound.starting_at);
 
   if (now < currentEnd || now >= nextStart) {
     throw new Error("Ya no puedes acceder al borrador: fuera del rango de edición");
   }
-  */
 
   const effectiveRoundName = roundName ?? nextRound.name;
 
