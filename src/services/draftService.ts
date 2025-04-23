@@ -170,8 +170,7 @@ export async function createDraftForRound(
     throw new Error("No se pudieron obtener las jornadas necesarias para crear el draft");
   }
 
-  /*
-  Aconst now = new Date();
+  const now = new Date();
   const currentEnd = new Date(currentRound.ending_at);
   const nextStart = new Date(nextRound.starting_at);
 
@@ -180,7 +179,6 @@ export async function createDraftForRound(
       "Solo se puede crear el draft entre el final de la jornada actual y el inicio de la siguiente"
     );
   }
-  */
 
   // ⚠️ Si ya existe una plantilla, no dejamos crear otra, sin importar si está finalizada o no
   const existingPlantilla = await sql<Plantilla[]>`
@@ -239,15 +237,13 @@ export async function updateTempPlantilla(
     throw new Error("No se pudieron obtener las jornadas para validar el tiempo de edición");
   }
 
-  /*
-  Aconst now = new Date();
+  const now = new Date();
   const currentEnd = new Date(currentRound.ending_at);
   const nextStart = new Date(nextRound.starting_at);
 
   if (now < currentEnd || now >= nextStart) {
     throw new Error("No puedes editar el draft fuera del rango de edición permitido");
   }
-  */
 
   const effectiveRoundName = roundName ?? nextRound.name;
 
@@ -362,7 +358,7 @@ export async function getPlantillaWithPlayers(
       throw new Error("No se encontró la jornada actual para la temporada actual");
     }
   }
-  
+
   const jornadaId = jornadaRecord.id;
 
   // 3. Busca la plantilla por usuario, liga y jornada
@@ -430,15 +426,13 @@ export async function getTempDraft(
     throw new Error("No se pudieron obtener las jornadas para validar el tiempo de acceso");
   }
 
-  /*
-  Aconst now = new Date();
+  const now = new Date();
   const currentEnd = new Date(currentRound.ending_at);
   const nextStart = new Date(nextRound.starting_at);
 
   if (now < currentEnd || now >= nextStart) {
     throw new Error("Ya no puedes acceder al borrador: fuera del rango de edición");
   }
-  */
 
   const effectiveRoundName = roundName ?? nextRound.name;
 
