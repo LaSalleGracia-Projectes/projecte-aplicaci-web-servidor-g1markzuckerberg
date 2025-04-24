@@ -6,6 +6,7 @@ import type Player from "../types/Player.js";
 import dotenv from "dotenv";
 import { jugadoresTable } from "../models/PlayerSupabase.js";
 import { jugadoresEquipos } from "../models/JugadorEquipoSeason.js";
+import { equiposTable } from "../models/EquipoSupabase.js";
 dotenv.config();
 
 const apiToken = process.env.API_TOKEN;
@@ -154,12 +155,24 @@ async function uploadJugadorEquipoSeasonRelation(players: Player[], seasonId: nu
 }
 
 /**
- * Obtiene todos los jugadores desde Supabase.
- * @returns {Promise<Player[]>} Lista de jugadores.
+ * Obtiene todos los jugadores desde Supabase, incluyendo información del equipo (nombre e imagen).
+ * @returns {Promise<any[]>} Lista de jugadores con sus respectivos datos de equipo.
  */
 async function getAllPlayersFromSupabase(): Promise<any[]> {
     try {
-        const players = await sql`SELECT * FROM ${sql(jugadoresTable)}`;
+        const players = await sql`
+            SELECT 
+                j.id, 
+                j."displayName", 
+                j."positionId", 
+                j."imagePath" AS "playerImage",
+                e.id        AS "teamId",
+                e.name      AS "teamName",
+                e."imagePath" AS "teamImage"
+            FROM ${sql(jugadoresTable)} j
+            JOIN ${sql(jugadoresEquipos)} jes ON j.id = jes.jugador_id
+            JOIN ${sql(equiposTable)} e ON e.id = jes.equipo_id
+            `;
         return players;
     } catch (error: any) {
         throw new Error(`Error obteniendo jugadores de Supabase: ${error.message}`);
@@ -171,14 +184,30 @@ async function getAllPlayersFromSupabase(): Promise<any[]> {
  * @param {number} playerId - ID del jugador.
  * @returns {Promise<Player | undefined>} Jugador o undefined si no se encuentra.
  */
+/**
+ * Obtiene un jugador por su ID desde Supabase, e incluye info del equipo.
+ * @param {number} playerId - ID del jugador.
+ * @returns {Promise<any>} Jugador (con info de equipo) o undefined si no se encuentra.
+ */
 async function getPlayerByIdFromSupabase(playerId: number): Promise<any> {
     try {
-        const [player] = await sql`
-            SELECT * FROM ${sql(jugadoresTable)}
-            WHERE id = ${playerId}
-            LIMIT 1
+    const [player] = await sql`
+        SELECT 
+            j.id, 
+            j."displayName", 
+            j."positionId", 
+            j."imagePath" AS "playerImage",
+            e.id        AS "teamId",
+            e.name      AS "teamName",
+            e."imagePath" AS "teamImage"
+        FROM ${sql(jugadoresTable)} j
+        JOIN ${sql(jugadoresEquipos)} jes ON j.id = jes.jugador_id
+        JOIN ${sql(equiposTable)} e ON e.id = jes.equipo_id
+        WHERE j.id = ${playerId}
+        LIMIT 1
         `;
-        return player;
+
+    return player;
     } catch (error: any) {
         throw new Error(`Error obteniendo jugador con id ${playerId} de Supabase: ${error.message}`);
     }

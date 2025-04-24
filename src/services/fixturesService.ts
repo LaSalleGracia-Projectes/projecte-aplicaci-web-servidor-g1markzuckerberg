@@ -6,39 +6,113 @@ import type Fixture from "../types/Fixture.js";
 import type { RoundsApiResponse } from "../types/RoundsApiResponse.js";
 import dotenv from "dotenv";
 dotenv.config();
-import type  Round from "../types/Round.js";
+import type Round from "../types/Round.js";
 const apiToken = process.env.API_TOKEN;
+import type FixtureExtended from "../types/FixtureExtended.js";
 
 /**
- * Obtiene los fixtures (partidos) de una jornada específica de la Liga.
- *
- * @param {string} roundNumber - Número de la jornada a consultar.
- * @returns {Promise<Fixture[]>} Lista de fixtures de la jornada solicitada.
- * @throws {Error} Si el número de jornada no existe en el mapeo.
+ * Normaliza un nombre: convierte a minúsculas y remueve acentos
  */
-async function getFixturesByRoundNumber(roundNumber: string): Promise<Fixture[]> {
-    // Buscar el ID de la jornada a partir del número
+function normalizeName(name: string): string {
+    return name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+
+/**
+ * Enriquecer un fixture con las imágenes de los equipos.
+ * Se obtiene el detalle del fixture (incluyendo lineups) para extraer los team_id.
+ * Luego se consulta cada equipo para obtener sus detalles y se compara el nombre
+ * obtenido con el que se espera (tomado de fixture.name, que tiene formato "Local vs Visitante").
+ */
+async function enrichFixture(fixture: Fixture): Promise<FixtureExtended> {
+    // Obtener detalles del fixture incluyendo los lineups
+    const fixtureDetailsUrl = `https://api.sportmonks.com/v3/football/fixtures/${fixture.id}?api_token=${apiToken}&include=lineups`;
+    const detailsResponse = await axios.get(fixtureDetailsUrl);
+    const { data: { data: { lineups } } } = detailsResponse;
+
+    // Extraer los team_id únicos de los lineups
+    const teamIds: number[] = [];
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+    lineups.forEach((lineup: any) => {
+        const teamId = Number(lineup.team_id);
+        if (!isNaN(teamId) && !teamIds.includes(teamId)) {
+            teamIds.push(teamId);
+        }
+    });
+
+    // Separar el nombre del fixture para obtener los nombres esperados de local y visitante
+    let localTeamNameExpected = "";
+    let visitantTeamNameExpected = "";
+    if (fixture.name.includes(" vs ")) {
+        const parts = fixture.name.split(" vs ");
+        localTeamNameExpected = parts[0].trim();
+        visitantTeamNameExpected = parts[1].trim();
+    }
+
+    const localExpected = normalizeName(localTeamNameExpected);
+    const visitantExpected = normalizeName(visitantTeamNameExpected);
+
+    // Función auxiliar para obtener los detalles de un equipo
+    async function getTeamDetails(teamId: number) {
+        const teamUrl = `https://api.sportmonks.com/v3/football/teams/${teamId}?api_token=${apiToken}`;
+        const response = await axios.get(teamUrl);
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+        return response.data.data;
+    }
+
+    // Obtener en paralelo los detalles de cada equipo
+    const teamsDetails = await Promise.all(teamIds.map(getTeamDetails));
+
+    let local_team_image = "";
+    let visitant_team_image = "";
+
+    teamsDetails.forEach((team: any) => {
+        const teamNameNormalized = normalizeName(String(team.name));
+        // Se asigna si el nombre del equipo contiene el nombre esperado
+        if (localExpected && teamNameNormalized.includes(localExpected)) {
+            local_team_image = team.image_path;
+        }
+
+        if (visitantExpected && teamNameNormalized.includes(visitantExpected)) {
+            visitant_team_image = team.image_path;
+        }
+    });
+
+    // Fallback en caso de que la comparación no funcione: usar el orden obtenido
+    if (!local_team_image && teamsDetails[0]) {
+        local_team_image = teamsDetails[0].image_path;
+    }
+
+    if (!visitant_team_image && teamsDetails[1]) {
+        visitant_team_image = teamsDetails[1].image_path;
+    }
+
+    // Retornar solo los campos requeridos
+    return {
+        id: fixture.id,
+        name: fixture.name,
+        result_info: fixture.result_info,
+        starting_at_timestamp: fixture.starting_at_timestamp,
+        local_team_image,
+        visitant_team_image,
+    };
+}
+
+/**
+ * Función principal que obtiene los fixtures de una jornada (usando el mapeo existente)
+ * y los enriquece con las imágenes de los equipos.
+ */
+async function getFixturesByRoundNumber(roundNumber: string): Promise<FixtureExtended[]> {
     const roundId = roundMapping[roundNumber];
     if (!roundId) {
         throw new Error(`No se encontró una jornada con el número: ${roundNumber}`);
     }
 
-    // Construir la URL
     const url = `https://api.sportmonks.com/v3/football/rounds/${roundId}?api_token=${apiToken}&include=fixtures`;
-
-    // Hacer la petición con Axios, tipando la respuesta
-    const response: AxiosResponse<RoundsApiResponse> = await axios.get<RoundsApiResponse>(url);
-
-    // Extraer la propiedad fixtures (asegúrate de que tu interfaz RoundData la tenga)
+    const response: AxiosResponse<RoundsApiResponse> = await axios.get(url);
     const { fixtures } = response.data.data;
 
-    // Mapear los fixtures tipando el parámetro para evitar el error "implicitly has an 'any' type"
-    return fixtures.map((fixture: Fixture) => ({
-        id: fixture.id,
-        name: fixture.name,
-        result_info: fixture.result_info,
-        starting_at_timestamp: fixture.starting_at_timestamp
-    }));
+    const enrichedFixtures = await Promise.all(fixtures.map(async (fixture: Fixture) => enrichFixture(fixture)));
+    return enrichedFixtures;
 }
 /**
  * Obtiene la jornada actual en curso dentro de la temporada activa.
@@ -122,6 +196,5 @@ async function getRoundsBySeasonId(seasonId: number): Promise<Round[]> {
         throw new Error("Error al obtener las jornadas de la temporada.");
     }
 }
-
 
 export { getFixturesByRoundNumber, getCurrentRounds, getCurrentSeasonId, getRoundsBySeasonId };

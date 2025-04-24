@@ -149,3 +149,32 @@ export const getAllJornadas = async (seasonId: number): Promise<Round[]> => {
     throw new Error(`Database error while fetching all jornadas`);
   }
 };
+
+/**
+ * Obtiene la siguiente jornada asumiendo que su id es igual al id de la jornada actual + 1.
+ *
+ * @returns La siguiente Round, o undefined si no se encuentra.
+ */
+export async function getNextJornada(): Promise<Round | undefined> {
+  try {
+    // Obtener la jornada actual usando el servicio ya implementado.
+      const currentJornada = await getCurrentJornada();
+      if (!currentJornada) {
+          console.warn("No se encontró la jornada actual");
+          return undefined;
+      }
+
+  // Suponemos que la siguiente jornada es la que tiene id = currentJornada.id + 1.
+  const [nextJornada] = await sql<Round[]>`
+      SELECT *
+      FROM ${sql(jornadaTable)}
+      WHERE id = ${Number(currentJornada.id) + 1}
+      LIMIT 1
+  `;
+
+  return nextJornada;
+  } catch (error: any) {
+      console.error("❌ Error al obtener la siguiente jornada:", error);
+      throw new Error("Database error while fetching the next jornada");
+  }
+}
