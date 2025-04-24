@@ -28,6 +28,7 @@ authRouter.post('/logoutMobile', authMiddleware, logoutMobile);
 // 🔐 Google OAuth - Web
 authRouter.get('/google/web', safePassportAuth('google', { scope: ['profile', 'email'] }));
 authRouter.get('/google/web/callback', safePassportAuth('google', { failureRedirect: '/login' }), googleWebCallback);
+authRouter.post('/google/web/token', googleWebCallback);
 
 // 📱 Google OAuth - Mobile
 authRouter.get('/google/mobile', safePassportAuth('google-mobile', { scope: ['profile', 'email'] }));
