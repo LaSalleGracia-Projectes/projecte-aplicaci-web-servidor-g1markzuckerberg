@@ -33,60 +33,76 @@ import { getUserByIdService } from '../../services/userService.js';
  */
 const createLiga = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const { name } = req.body as { name: string };
+    console.log('🔵 Entrando en createLiga');
 
-    // Verificar autenticación del usuario
+    const { name } = req.body as { name: string };
     const user = res.locals.user as { id: number; correo: string; teamId?: number };
+
     if (!user?.correo || !user?.id) {
+      console.warn('⚠️ Usuario no autenticado');
       res.status(httpStatus.unauthorized).send({ error: 'No autorizado' });
       return;
     }
 
-    // Obtener la jornada actual (para asociarla a la liga)
+    console.log(`👤 Usuario autenticado: id=${user.id}, correo=${user.correo}`);
+
     const currentJornada = await getCurrentJornada();
     if (!currentJornada) {
+      console.error('❌ No se pudo obtener la jornada actual');
       res.status(httpStatus.internalServerError).send({ error: 'No se pudo obtener la jornada actual' });
       return;
     }
 
-    // Crear la liga (se asume que createLigaService retorna un objeto Liga)
+    console.log(`📅 Jornada actual obtenida: id=${currentJornada.id}`);
+
     const newLiga: Liga = {
-      id: 0, // Se genera automáticamente en la BD
+      id: 0,
       name,
       jornada_id: currentJornada.id,
       created_by: user.correo,
       created_jornada: Number(currentJornada.name),
-      code: '' // Se generará según la lógica interna
+      code: ''
     };
 
     const ligaCreated = await createLigaService(newLiga);
     if (!ligaCreated) {
+      console.error('❌ No se pudo crear la liga');
       res.status(httpStatus.internalServerError).send({ error: 'No se pudo crear la liga' });
       return;
     }
 
-    // El usuario que crea la liga se une automáticamente como capitán.
+    console.log(`✅ Liga creada correctamente: id=${ligaCreated.id}, name=${ligaCreated.name}`);
+
     const added = await addUserToLigaService(user.id, ligaCreated.id, true);
     if (!added) {
+      console.error('❌ Error al unir al usuario a la liga');
       res.status(httpStatus.internalServerError).send({ error: 'Error al unirse a la liga' });
       return;
     }
 
-    // Crear notificación para el usuario creador.
+    console.log(`✅ Usuario unido a la liga como capitán`);
+
+    // Crear notificación
     const notificationMessage = `Has creado la liga ${ligaCreated.name} correctamente`;
     const notification = await createNotificationForUser(notificationMessage, user.id);
 
-    // Emisión mediante socket.io (suponiendo que la instancia está en req.app.locals.io).
+    console.log('🔔 Notificación creada:', notification);
+
+    // Enviar notificación por socket
     const { io } = req.app.locals as { io?: SocketIOServer };
     if (io) {
+      console.log('➡️ Emitiendo notificación por socket.io a sala:', `user_${user.id}`);
       io.to(`user_${user.id}`).emit("notification", notification);
+    } else {
+      console.warn('⚠️ Socket.IO no está disponible en app.locals.io');
     }
 
     res.status(httpStatus.created).send({
       message: 'Liga creada y usuario añadido como capitán',
       liga: ligaCreated
     });
-  } catch (error: unknown) {
+  } catch (error) {
+    console.error('❌ Error en createLiga:', error);
     next(error);
   }
 };
