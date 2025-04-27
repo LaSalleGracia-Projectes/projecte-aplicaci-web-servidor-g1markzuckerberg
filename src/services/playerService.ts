@@ -158,24 +158,43 @@ async function uploadJugadorEquipoSeasonRelation(players: Player[], seasonId: nu
  * Obtiene todos los jugadores desde Supabase, incluyendo información del equipo (nombre e imagen).
  * @returns {Promise<any[]>} Lista de jugadores con sus respectivos datos de equipo.
  */
-async function getAllPlayersFromSupabase(): Promise<any[]> {
+async function getAllPlayersFromSupabase(
+    sortPoints?: 'up' | 'down',
+    teamName?: string
+  ): Promise<any[]> {
     try {
-        const players = await sql`
-            SELECT 
-                j.id, 
-                j."displayName", 
-                j."positionId", 
-                j."imagePath" AS "playerImage",
-                e.id        AS "teamId",
-                e.name      AS "teamName",
-                e."imagePath" AS "teamImage"
-            FROM ${sql(jugadoresTable)} j
-            JOIN ${sql(jugadoresEquipos)} jes ON j.id = jes.jugador_id
-            JOIN ${sql(equiposTable)} e ON e.id = jes.equipo_id
-            `;
-        return players;
+      // Condición de filtrado por equipo
+      const whereTeam = teamName
+        ? sql`WHERE e.name = ${teamName}`
+        : sql``;
+  
+      // Cláusula ORDER BY para puntos
+      const orderPoints = sortPoints === 'up'
+        ? sql`ORDER BY j.puntos_totales ASC`
+        : sortPoints === 'down'
+        ? sql`ORDER BY j.puntos_totales DESC`
+        : sql``;
+  
+      const query = sql`
+        SELECT 
+          j.id, 
+          j."displayName", 
+          j."positionId", 
+          j."imagePath"    AS "playerImage",
+          j.puntos_totales AS "points",
+          e.id             AS "teamId",
+          e.name           AS "teamName",
+          e."imagePath"    AS "teamImage"
+        FROM ${sql(jugadoresTable)} j
+        JOIN ${sql(jugadoresEquipos)} jes ON j.id = jes.jugador_id
+        JOIN ${sql(equiposTable)}    e   ON e.id = jes.equipo_id
+        ${whereTeam}
+        ${orderPoints}
+      `;
+      const players = await sql`${query}`;
+      return players;
     } catch (error: any) {
-        throw new Error(`Error obteniendo jugadores de Supabase: ${error.message}`);
+      throw new Error(`Error obteniendo jugadores de Supabase: ${error.message}`);
     }
 }
 
