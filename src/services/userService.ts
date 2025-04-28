@@ -443,8 +443,38 @@ const getMyUserService = async (userId: number): Promise<UserI | undefined> => {
   }
 };
 
+const pushFcmUserTokenService = async (userId: number, fcmToken: string): Promise<boolean> => {
+  try {
+    const result = await sql`
+      UPDATE ${sql(userTable)}
+      SET "fcm_token" = ${fcmToken}
+      WHERE id = ${userId}
+      RETURNING id;
+    `;
+    return result.length > 0;
+  } catch (error) {
+    console.error("❌ Error updating fcm_token:", error);
+    throw new Error("Database error while updating fcm_token");
+  }
+};
+
+const getFcmUserTokenService = async (userId: number): Promise<string | undefined> => {
+  try {
+    const [user] = await sql<Array<{ fcm_token: string }>>`
+      SELECT "fcm_token"
+      FROM ${sql(userTable)}
+      WHERE id = ${userId}
+      LIMIT 1;
+    `;
+    return user?.fcm_token ?? null;
+  } catch (error) {
+    console.error("❌ Error fetching fcm_token:", error);
+    throw new Error("Database error while fetching fcm_token");
+  }
+};
 
 export { getUserService, getUserByIdService, createUserService, findUserByEmail,
   deleteUserByEmail, updateUserTokens, updateBirthDateService, updateUsernameService,
   updatePasswordService, adminUpdateUserService, getUserByIdAdminService, getLeaguesByUserService,
-  forgotPasswordService, updateGoogleIdService, getAllUsersService, getMyUserService };
+  forgotPasswordService, updateGoogleIdService, getAllUsersService, getMyUserService,
+  pushFcmUserTokenService, getFcmUserTokenService };
