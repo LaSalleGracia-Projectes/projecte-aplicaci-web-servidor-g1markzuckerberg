@@ -167,24 +167,69 @@ const regenerateWebToken = async (req: Request, res: Response, next: NextFunctio
   }
 };
 
-const googleWebCallback = async (req: Request, res: Response): Promise<void> => {
-  const user = req.user as UserI | undefined;
-  const jwtSecret = process.env.JWT_SECRET_KEY;
-
-  if (!user?.id || !user.correo || !jwtSecret) {
-    res.redirect('/login');
-    return;
-  }
-
-  const webToken = jwt.sign({ id: user.id, correo: user.correo, isAdmin: user.is_admin }, jwtSecret, { expiresIn: '1h' });
-  const refreshWebToken = jwt.sign({ id: user.id, correo: user.correo, isAdmin: user.is_admin }, jwtSecret, { expiresIn: '7d' });
-
-  await updateUserTokens(user.id, { webToken, refreshWebToken });
-
-  res.redirect(`http://localhost:3000?webToken=${webToken}&refreshWebToken=${refreshWebToken}`);
-};
-
 const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+async function googleWebCallback(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
+  try {
+    const { idToken } = req.body as { idToken?: string };
+    if (!idToken) {
+      res.status(httpStatus.badRequest).json({ error: 'Falta el idToken' });
+      return;
+    }
+
+    // 1) Verify ID token with Google
+    const ticket = await client.verifyIdToken({
+      idToken,
+      audience: process.env.GOOGLE_CLIENT_ID,
+    });
+    const payload = ticket.getPayload();
+    if (!payload?.email) {
+      res.status(httpStatus.unauthorized).json({ error: 'Token inválido' });
+      return;
+    }
+
+    const correo = payload.email;
+    const username = payload.name ?? '';
+    const googleId = payload.sub;
+
+    // 2) Find or create user
+    let user: UserI | undefined = await findUserByEmail(correo);
+    if (user) {
+      if (!user.google_id && googleId) {
+        await updateGoogleIdService(user.id!, googleId);
+        user.google_id = googleId;
+      }
+    } else {
+      // eslint-disable-next-line @typescript-eslint/naming-convention
+      user = await createUserService({ correo, username, google_id: googleId });
+    }
+
+    // 3) Sign our JWTs
+    const jwtSecret = process.env.JWT_SECRET_KEY!;
+    const webToken = jwt.sign(
+      { id: user.id, correo: user.correo, isAdmin: user.is_admin },
+      jwtSecret,
+      { expiresIn: webTokenExpiration }
+    );
+    const refreshWebToken = jwt.sign(
+      { id: user.id, correo: user.correo, isAdmin: user.is_admin },
+      jwtSecret,
+      { expiresIn: refreshWebTokenExpiration }
+    );
+
+    // 4) Persist them
+    await updateUserTokens(user.id!, { webToken, refreshWebToken });
+
+    // 5) Respond
+    res.status(httpStatus.ok).json({ webToken, refreshWebToken });
+  } catch (err) {
+    next(err);
+  }
+}
 
 const googleMobileCallBack = async (req: Request, res: Response): Promise<Response | void> => {
   const { idToken } = req.body as { idToken: string };

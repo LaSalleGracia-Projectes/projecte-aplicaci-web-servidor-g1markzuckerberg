@@ -6,9 +6,24 @@ import type Player from '../../types/Player.js';
 /**
  * Controlador para obtener todos los jugadores desde Supabase.
  */
-async function getAllPlayersSupa(req: Request, res: Response, next: NextFunction): Promise<void> {
+async function getAllPlayersSupa(
+  req: Request,
+  res: Response,
+  next: NextFunction
+): Promise<void> {
   try {
-    const players = await getAllPlayersFromSupabase();
+    // Leer y validar query params
+    const { points, team } = req.query;
+    let sortPoints: 'up' | 'down' | undefined;
+    if (points === 'up' || points === 'down') {
+      sortPoints = points;
+    }
+
+    const teamName = typeof team === 'string' && team.trim() !== ''
+      ? team.trim()
+      : undefined;
+
+    const players = await getAllPlayersFromSupabase(sortPoints, teamName);
     res.status(httpStatus.ok).json({ players });
   } catch (error: unknown) {
     next(error);
