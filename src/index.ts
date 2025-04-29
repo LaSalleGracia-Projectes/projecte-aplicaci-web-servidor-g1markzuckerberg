@@ -9,6 +9,10 @@ import 'dotenv/config.js';
 import { startJornadaCronJob } from './api/controllers/jornadaCronCrontoller.js';
 import passport from 'passport';
 import './config/passport.js';
+import admin from 'firebase-admin';
+import fs from 'fs';
+import path from 'path';
+import { type ServiceAccount } from 'firebase-admin';
 
 // Inicializar Express
 const app: Express = express();
@@ -32,6 +36,7 @@ const startServer = async () => {
     });
 
     app.use(passport.initialize());
+    app.use(express.json());
 
     // API routes
     app.use('/api/v1', apiRouter);
@@ -66,6 +71,20 @@ const startServer = async () => {
 
     // Hacer io accesible desde controllers
     app.locals.io = io;
+
+    // Cargar la ruta desde el ENV
+    const keyPath = path.resolve(process.cwd(), process.env.FIREBASE_CREDENTIALS!);
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+    const serviceAccount: ServiceAccount = JSON.parse(
+      fs.readFileSync(keyPath, 'utf-8')
+    );
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+    admin.initializeApp({
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+      credential: admin.credential.cert(serviceAccount)
+    });
 
     // Iniciar el servidor HTTP
     httpServer.listen(port, () => {
