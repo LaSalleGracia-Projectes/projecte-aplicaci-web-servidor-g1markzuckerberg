@@ -2,24 +2,27 @@ import admin from 'firebase-admin';
 import { getFcmUserTokenService } from './userService.js';
 
 /* Enviar notificación FCM a un token específico */
-export async function sendPushNotification(fcmToken: string, title: string, body: string) {
-  try {
-    const message: admin.messaging.Message = {
-      notification: {
-        title,
-        body,
-      },
-      token: fcmToken,
-    };
+export async function sendPushNotification(
+  fcmToken: string,
+  title: string,
+  body: string,
+) {
+  const message: admin.messaging.Message = {
+    token: fcmToken,
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-    const response: string = await admin.messaging().send(message);
-    console.log("✅ FCM mensaje enviado:", response);
-    return response;
-  } catch (error) {
-    console.error("❌ Error enviando FCM:", error);
-    throw error instanceof Error ? error : new Error(String(error));
-  }
+    /* 👇 Esto hace que Android la muestre aunque la app esté “kill-ed” */
+    android: {
+      priority: "high",
+      notification: {
+        channelId: "general",   // 🔸 debe existir en la app
+        sound: "default",
+      },
+    },
+
+    notification: { title, body },
+  };
+
+  return admin.messaging().send(message);
 }
 
 export async function sendFcmNotificationToUser(userId: number, title: string, body: string) {
