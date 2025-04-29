@@ -2,8 +2,10 @@ import httpStatus from '../config/httpStatusCodes.js';
 import type { Request, Response, NextFunction } from 'express';
 import type { Server as SocketIOServer } from 'socket.io';
 import { createNotificationForUser, createGlobalNotification, getNotificationsByUserId } from '../../services/notificacionesService.js';
+import { getFcmUserTokenService, pushFcmUserTokenService } from '../../services/userService.js';
 import type Notificacion from '../../types/Notificaciones.js';
 import { getLigaByIdService } from '../../services/ligaSupaService.js';
+import type UserI from '../../types/UserI.js';
 
 /**
  * Crea una notificación para un usuario específico y emite el evento a través de socket.io.
@@ -85,4 +87,47 @@ async function getNotificationsController(req: Request, res: Response, next: Nex
   }
 }
 
-export { sendUserNotificationController, sendGlobalNotificationController, getNotificationsController };
+/** 🔹 Guardar o actualizar el FCM token */
+async function pushFcmTokenController(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { user } = res.locals as { user: { id: number } };
+    const { fcmToken } = req.body as { fcmToken: string };
+    if (!fcmToken) {
+      res.status(httpStatus.badRequest).json({ error: "Falta el token" });
+      return;
+    }
+
+    const success = await pushFcmUserTokenService(user.id, fcmToken);
+    if (success) {
+      res.status(httpStatus.ok).json({ message: "Token actualizado" });
+    } else {
+      res.status(httpStatus.internalServerError).json({ error: "No se pudo actualizar el token" });
+    }
+  } catch (error: unknown) {
+    next(error);
+  }
+}
+
+/** 🔹 Obtener el FCM token de un usuario por id */
+async function getFcmTokenController(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const { id } = req.params as { id: string };
+    const userId = parseInt(id, 10);
+    if (isNaN(userId)) {
+      res.status(httpStatus.badRequest).json({ error: "ID inválido" });
+      return;
+    }
+
+    const token = await getFcmUserTokenService(userId);
+    if (token) {
+      res.status(httpStatus.ok).json({ fcmToken: token });
+    } else {
+      res.status(httpStatus.notFound).json({ error: "Token no encontrado" });
+    }
+  } catch (error: unknown) {
+    next(error);
+  }
+}
+
+export { sendUserNotificationController, sendGlobalNotificationController, getNotificationsController,
+  pushFcmTokenController, getFcmTokenController };
