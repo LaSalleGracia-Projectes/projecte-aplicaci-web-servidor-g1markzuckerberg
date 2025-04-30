@@ -4,7 +4,8 @@ import {
   deleteUserByEmail, 
   getUserByIdAdminService, 
   adminUpdateUserService,
-  getAllUsersService 
+  getAllUsersService,
+  adminDeleteUserService
 } from '../../services/userService.js';
 import httpStatus from '../config/httpStatusCodes.js';
 import type UserI from '../../types/UserI.js';
@@ -130,10 +131,39 @@ const adminUpdateUserController = async (req: Request, res: Response, next: Next
   }
 };
 
+/**
+ * Eliminar un usuario
+ */
+const adminDeleteUserController = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const admin = res.locals.user as { id: number; is_admin: boolean };
+    const userId = Number(req.params.userId);
+
+    const deleted = await adminDeleteUserService(admin.id, userId);
+
+    if (!deleted) {
+      return res.status(httpStatus.notFound).json({ error: 'User not found' });
+    }
+
+    res.status(httpStatus.ok).json({ message: 'User deleted successfully' });
+  } catch (error: any) {
+    if (
+      error instanceof Error &&
+      typeof error.message === 'string' &&
+      error.message.startsWith('Unauthorized')
+    ) {
+      return res.status(httpStatus.unauthorized).json({ error: error.message });
+    }
+
+    next(error);
+  }
+};
+
 export { 
   getUserByMail, 
   deleteAccountByMail, 
   adminGetUserByIdController,
   adminGetAllUsersController,
-  adminUpdateUserController
+  adminUpdateUserController,
+  adminDeleteUserController
 };

@@ -10,6 +10,7 @@ interface UserI {
   mobileToken?: string;
   refreshWebToken?: string;
   birthDate?: Date;
+  fcm_token?: string;
 }
 
 export default UserI;

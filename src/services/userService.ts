@@ -443,8 +443,82 @@ const getMyUserService = async (userId: number): Promise<UserI | undefined> => {
   }
 };
 
+const pushFcmUserTokenService = async (userId: number, fcmToken: string): Promise<boolean> => {
+  try {
+    const result = await sql`
+      UPDATE ${sql(userTable)}
+      SET "fcm_token" = ${fcmToken}
+      WHERE id = ${userId}
+      RETURNING id;
+    `;
+    return result.length > 0;
+  } catch (error) {
+    console.error("❌ Error updating fcm_token:", error);
+    throw new Error("Database error while updating fcm_token");
+  }
+};
+
+const getFcmUserTokenService = async (userId: number): Promise<string | undefined> => {
+  try {
+    const [user] = await sql<Array<{ fcm_token: string }>>`
+      SELECT "fcm_token"
+      FROM ${sql(userTable)}
+      WHERE id = ${userId}
+      LIMIT 1;
+    `;
+    return user?.fcm_token ?? null;
+  } catch (error) {
+    console.error("❌ Error fetching fcm_token:", error);
+    throw new Error("Database error while fetching fcm_token");
+  }
+};
+
+/**
+ * **Eliminar un usuario como administrador**
+ * 
+ * @param adminId  - ID del usuario que realiza la petición (debe ser admin)
+ * @param userId   - ID del usuario que se desea eliminar
+ * @returns        - `true` si se eliminó al menos un registro
+ */
+const adminDeleteUserService = async (
+  adminId: number,
+  userId: number
+): Promise<boolean> => {
+  try {
+    // Admin Verification
+    const [admin] = await sql<UserI[]>`
+      SELECT is_admin
+      FROM ${sql(userTable)}
+      WHERE id = ${adminId}
+      LIMIT 1;
+    `;
+
+    if (!admin || !admin.is_admin) {
+      throw new Error('Unauthorized: Only admins can perform this action');
+    }
+
+    // Delete User
+    const result = await sql`
+      DELETE FROM ${sql(userTable)}
+      WHERE id = ${userId}
+      RETURNING id;
+    `;
+
+    return result.length > 0;
+  } catch (error) {
+    console.error('❌ Error deleting user as admin:', error);
+
+    // Mensaje utorización
+    if (error instanceof Error && error.message.startsWith('Unauthorized')) {
+      throw error;
+    }
+
+    throw new Error('Database error while deleting user');
+  }
+};
 
 export { getUserService, getUserByIdService, createUserService, findUserByEmail,
   deleteUserByEmail, updateUserTokens, updateBirthDateService, updateUsernameService,
   updatePasswordService, adminUpdateUserService, getUserByIdAdminService, getLeaguesByUserService,
-  forgotPasswordService, updateGoogleIdService, getAllUsersService, getMyUserService };
+  forgotPasswordService, updateGoogleIdService, getAllUsersService, getMyUserService,
+  pushFcmUserTokenService, getFcmUserTokenService, adminDeleteUserService };
