@@ -6,7 +6,7 @@ import { uploadUserImageController, updateBirthDateController, updatePasswordCon
   getMyUserController } from '../../api/controllers/userController.js';
 import validate from '../middlewares/joiValidation.js';
 import { updateBirthDateSchema, updatePwdSchema, updateUsernameSchema } from '../models/Joi/userSchemas.js';
-import { getNotificationsController } from '../controllers/notificacionesController.js';
+import { getNotificationsController, getFcmTokenController, pushFcmTokenController } from '../controllers/notificacionesController.js';
 
 const userRouter = Router();
 
@@ -27,6 +27,12 @@ userRouter.get('/me', authMiddleware, getMyUserController);
 
 // Ruta para obtener las notificaciones del usuario
 userRouter.get('/notifications', authMiddleware, getNotificationsController);
+
+// Ruta para guardar o actualizar el FCM token del usuario
+userRouter.post('/fcm-token', authMiddleware, pushFcmTokenController);
+// Ruta para obtener el FCM token de un usuario por id
+userRouter.get('/fcm-token/:id', authMiddleware, getFcmTokenController);
+
 
 
 export default userRouter;

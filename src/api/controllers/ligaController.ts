@@ -15,6 +15,7 @@ import { fileURLToPath } from 'url';
 import { createNotificationForUser } from '../../services/notificacionesService.js';
 import type { Server as SocketIOServer } from "socket.io";
 import { getUserByIdService } from '../../services/userService.js';
+import { sendFcmNotificationToUser } from '../../services/fcmService.js';
 
 
 /**
@@ -116,32 +117,31 @@ const joinLiga = async (req: Request, res: Response, next: NextFunction): Promis
   try {
     const { ligaCode } = req.params;
 
-    // Verificar autenticación del usuario
     const user = res.locals.user as { id: number; correo: string; teamId?: number };
     if (!user?.id) {
       res.status(httpStatus.unauthorized).send({ error: 'No autorizado' });
       return;
     }
 
-    // Buscar la liga (se asume que findLigaByCodeService existe)
+    // Buscar la liga
     const liga = await findLigaByCodeService(ligaCode);
     if (!liga) {
       res.status(httpStatus.notFound).send({ error: 'Liga no encontrada' });
       return;
     }
 
-    // Agregar el usuario a la liga (como miembro, no capitan)
+    // Agregar usuario a liga
     const joined = await addUserToLigaService(user.id, liga.id, false);
     if (!joined) {
       res.status(httpStatus.internalServerError).send({ error: 'No se pudo unir a la liga' });
       return;
     }
 
-    // Crear notificación para indicar que se ha unido a la liga.
+    // Notificacion union a liga
     const notificationMessage = `Te has unido a la liga ${liga.name} con éxito`;
     const notification = await createNotificationForUser(notificationMessage, user.id);
 
-    // Emitir notificación mediante socket.io.
+    // Emitir notificación socket
     const { io } = req.app.locals as { io?: SocketIOServer };
     if (io) {
       io.to(`user_${user.id}`).emit("notification", notification);
@@ -171,7 +171,6 @@ const getUsersByLiga = async (req: Request, res: Response, next: NextFunction) =
     const { ligaCode } = req.params;
     const { jornada } = req.query as { jornada?: string };
 
-    // Verificar autenticación del usuario
     const user = res.locals.user as { id: number };
     if (!user?.id) {
       return res.status(httpStatus.unauthorized).json({ error: 'No autorizado' });
@@ -189,10 +188,10 @@ const getUsersByLiga = async (req: Request, res: Response, next: NextFunction) =
       return res.status(httpStatus.unauthorized).json({ error: 'No estás unido a esta liga' });
     }
 
-    // Obtener usuarios de la liga (según el código y, opcionalmente, la jornada)
+    // Obtener usuarios de la liga
     const result = await getUsersByLigaService(ligaCode, jornada);
 
-    // Procesar cada registro para agregar la URL de la imagen de perfil
+    // URL Perfil
     const typedUsers = (result.users as unknown) as Array<{ [key: string]: any; id: number }>;
     const usersWithImage = typedUsers.map((userRecord) => ({
       ...userRecord,
@@ -218,20 +217,17 @@ const getUsersByLiga = async (req: Request, res: Response, next: NextFunction) =
  */
 const getLigaCodeById = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // Verificar que el usuario esté autenticado.
     const user = res.locals.user as { id: number };
     if (!user?.id) {
       return res.status(httpStatus.unauthorized).send({ error: 'No autorizado' });
     }
     
-    // Extraer el id de la liga desde los parámetros.
     const { ligaId } = req.params;
     const id = Number(ligaId);
     if (isNaN(id)) {
       return res.status(httpStatus.badRequest).send({ error: 'Id de liga inválido' });
     }
     
-    // Llamar al servicio para obtener el código de la liga.
     const code = await getLigaCodeByIdService(id, user.id);
     
     // Devolver el código.
@@ -252,14 +248,12 @@ const getLigaCodeById = async (req: Request, res: Response, next: NextFunction) 
  */
 const removeUserFromLiga = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    // El ID del usuario que realiza la acción (capitán) se obtiene desde res.locals.
     const capitan = res.locals.user as { id: number };
     if (!capitan?.id) {
       res.status(httpStatus.unauthorized).send({ error: 'No autorizado' });
       return;
     }
 
-    // Extraer los parámetros: ligaId y userId (del usuario a eliminar).
     const { ligaId, userId } = req.params;
     const leagueId = Number(ligaId);
     const userIdToRemove = Number(userId);
@@ -268,10 +262,8 @@ const removeUserFromLiga = async (req: Request, res: Response, next: NextFunctio
       return;
     }
 
-    // Llamar al servicio para eliminar el usuario de la liga.
     await removeUserFromLigaService(capitan.id, leagueId, userIdToRemove);
 
-    // Obtener datos de la liga y del usuario expulsado.
     const liga = await getLigaByIdService(leagueId);
     if (!liga) {
       res.status(httpStatus.notFound).send({ error: 'Liga no encontrada' });
@@ -280,22 +272,20 @@ const removeUserFromLiga = async (req: Request, res: Response, next: NextFunctio
 
     const expulsado = await getUserByIdService(userIdToRemove.toString());
 
-    // Preparar los mensajes de notificación.
     const mensajeCapitan = `Has expulsado a ${expulsado.username ?? expulsado.correo} de la liga ${liga.name}`;
     const mensajeExpulsado = `Has sido expulsado de la liga ${liga.name}`;
 
-    // Crear las notificaciones en la base de datos.
     const notiCapitan = await createNotificationForUser(mensajeCapitan, capitan.id);
     const notiExpulsado = await createNotificationForUser(mensajeExpulsado, userIdToRemove);
 
-    // Obtener la instancia de socket.io y emitir los eventos.
     const { io } = req.app.locals as { io?: SocketIOServer };
     if (io) {
-      // Enviar notificación al capitán.
       io.to(`user_${capitan.id}`).emit("notification", notiCapitan);
-      // Enviar notificación al usuario expulsado.
       io.to(`user_${userIdToRemove}`).emit("notification", notiExpulsado);
     }
+
+    // FCM 
+    await sendFcmNotificationToUser(userIdToRemove, "Expulsado de la Liga", mensajeExpulsado);
 
     res.status(httpStatus.ok).send({ message: "Usuario eliminado de la liga correctamente" });
   } catch (error) {
@@ -305,9 +295,8 @@ const removeUserFromLiga = async (req: Request, res: Response, next: NextFunctio
 
 const assignNewCaptain = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // Obtenemos el usuario autenticado desde res.locals.
     const user = res.locals.user as { id: number };
-    const { ligaId, newCaptainId } = req.params; // Ahora ambos vienen en la URL
+    const { ligaId, newCaptainId } = req.params;
 
     await assignNewCaptainService(user.id, Number(ligaId), Number(newCaptainId));
     res.status(200).json({ message: 'Nuevo capitán asignado correctamente' });
@@ -337,7 +326,7 @@ const uploadLeagueImageByCaptainController = async (req: Request, res: Response,
       return res.status(httpStatus.unauthorized).json({ error: 'No autorizado' });
     }
     
-    // Verificar que el usuario sea capitán de la liga
+    // Usuario capitan verification
     const [captainRecord] = await sql`
       SELECT is_capitan FROM ${sql(usuariosLigasTable)}
       WHERE usuario_id = ${user.id} AND liga_id = ${ligaId}
@@ -352,7 +341,7 @@ const uploadLeagueImageByCaptainController = async (req: Request, res: Response,
       return res.status(httpStatus.badRequest).json({ error: 'No se ha subido ninguna imagen.' });
     }
     
-    // Construir la URL relativa de la imagen
+    // URL Imagen
     const imageUrl = `/img/ligas/leagueImage${ligaId}${path.extname(req.file.originalname)}`;
     
     res.status(httpStatus.ok).json({
@@ -408,10 +397,9 @@ const getUserFromLeagueController = async (req: Request, res: Response, next: Ne
       return res.status(httpStatus.badRequest).json({ error: 'ID inválido' });
     }
     
-    // Se asume que la autenticación y verificación de membresía se realizan en middleware
     const userRecord = await getUserFromLeagueByIdService(parsedLeagueId, parsedUserId);
     
-    // Agregar la URL de la imagen de perfil (ej: /api/v1/user/get-image?userId=<ID>)
+    // URL Imagen
     const userWithImage = {
       ...userRecord,
       imageUrl: `/api/v1/user/get-image?userId=${userRecord.id}`
@@ -436,14 +424,13 @@ const getUserFromLeagueController = async (req: Request, res: Response, next: Ne
  */
 const updateLigaNameController = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    // Verificar autenticación del usuario
     const user = res.locals.user as { id: number; correo: string };
     if (!user?.correo) {
       res.status(httpStatus.unauthorized).json({ error: 'No autorizado' });
       return;
     }
     
-    // Extraer el ID de la liga desde los parámetros de la URL
+    // ID liga
     const { ligaId } = req.params;
     const id = Number(ligaId);
     if (isNaN(id)) {
@@ -451,15 +438,14 @@ const updateLigaNameController = async (req: Request, res: Response, next: NextF
       return;
     }
     
-    // Extraer el nuevo nombre de la liga desde el body
+    // Nombre liga
     const { newName } = req.body as { newName: string };
     if (!newName) {
       res.status(httpStatus.badRequest).json({ error: 'Nuevo nombre no proporcionado' });
       return;
     }
     
-    // Llamar al servicio para actualizar el nombre de la liga.
-    // Este servicio verifica que el usuario sea el capitán comparando el email.
+    // Verifica que el usuario sea el capitán comparando el email.
     const updatedLiga = await updateLigaNameService(id, newName, user.correo);
     if (!updatedLiga) {
       res.status(httpStatus.internalServerError).json({ error: 'No se pudo actualizar la liga' });

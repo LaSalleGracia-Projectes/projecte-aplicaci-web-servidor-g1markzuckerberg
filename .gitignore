@@ -131,3 +131,6 @@ dist
 
 # macOS Finder
 .DS_Store
+
+# secrets
+secrets

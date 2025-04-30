@@ -16,6 +16,9 @@ import type Round from '../../types/Round.js';
 import { uploadRoundFantasyPoints } from '../../services/jornadaJugadorService.js';
 import type { Server as SocketIOServer } from "socket.io";
 import { createGlobalNotification } from '../../services/notificacionesService.js';
+import { getAllUsersService } from '../../services/userService.js';
+import { sendFcmNotificationToUser } from '../../services/fcmService.js';
+
 
 // URL Base de la API Sportmonks
 // eslint-disable-next-line @typescript-eslint/naming-convention
@@ -179,14 +182,12 @@ export async function notifyDraftOpeningAt6am(): Promise<void> {
   try {
     console.log("⏳ [notifyDraftOpeningAt6am] Verificando si hoy es el último día de la jornada actual...");
 
-    // Obtener la jornada actual (se asume que getCurrentJornada ya está implementada)
     const currentRound: Round | undefined = await getCurrentJornada();
     if (!currentRound) {
       console.warn("⚠️ [notifyDraftOpeningAt6am] No se encontró la jornada actual");
       return;
     }
 
-    // Comprobar si hoy es el último día de la jornada actual comparando solo año, mes y día.
     const today = new Date();
     const endingAt = new Date(currentRound.ending_at);
     const isLastDay =
@@ -199,7 +200,6 @@ export async function notifyDraftOpeningAt6am(): Promise<void> {
       return;
     }
 
-    // Obtener la siguiente jornada (se asume que getNextJornada ya está implementada y que la siguiente tiene id = current.id + 1)
     const nextRound: Round | undefined = await getNextJornada();
     if (!nextRound) {
       console.warn("⚠️ [notifyDraftOpeningAt6am] No se encontró la siguiente jornada (id = currentJornada.id + 1)");
@@ -210,24 +210,35 @@ export async function notifyDraftOpeningAt6am(): Promise<void> {
     const formattedDate = nextStartDate.toLocaleDateString();
     const mensaje = `Ya se abre el plazo para crear los drafts hasta el ${formattedDate}`;
 
-    // Crear la notificación global
+    // Crear la notificación global en BD
     const notification = await createGlobalNotification(mensaje);
 
-    // Obtener la instancia de Socket.io (suponiendo que está guardada en global.app.locals.io)
+    // Emitir por Socket.IO
     const io = (global as any).app?.locals?.io as SocketIOServer | undefined;
     if (io) {
       io.emit("notification", notification);
-      console.log("✅ [notifyDraftOpeningAt6am] Notificación global enviada:", mensaje);
+      console.log("✅ [notifyDraftOpeningAt6am] Notificación global enviada por socket:", mensaje);
     } else {
       console.warn("⚠️ [notifyDraftOpeningAt6am] No se encontró la instancia de Socket.io");
     }
+
+    // **Enviar push FCM a todos los usuarios FCM**
+    const allUsers = await getAllUsersService();
+    await Promise.all(allUsers.map(async user => {
+      if (user.id !== null && user.id !== undefined) {
+        await sendFcmNotificationToUser(
+          user.id,
+          "Apertura de Draft",
+          mensaje
+        );
+      }
+    }));
+    console.log("✅ [notifyDraftOpeningAt6am] Push FCM enviado a todos los usuarios");
+
   } catch (error: any) {
     console.error("❌ [notifyDraftOpeningAt6am] Error:", error);
   }
 }
-
-
-
 
 /**
  * Inicia el cron job:
