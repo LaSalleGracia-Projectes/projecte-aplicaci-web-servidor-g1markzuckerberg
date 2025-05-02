@@ -180,17 +180,19 @@ async function getAllPlayersFromSupabase(
           j.id, 
           j."displayName", 
           j."positionId", 
-          j."imagePath"    AS "playerImage",
-          j.puntos_totales AS "points",
-          e.id             AS "teamId",
-          e.name           AS "teamName",
-          e."imagePath"    AS "teamImage"
+          j."imagePath"     AS "playerImage",
+          j.puntos_totales  AS "points",
+          j.estrellas       AS "estrellas",      -- <-- añadimos estrellas
+          e.id              AS "teamId",
+          e.name            AS "teamName",
+          e."imagePath"     AS "teamImage"
         FROM ${sql(jugadoresTable)} j
         JOIN ${sql(jugadoresEquipos)} jes ON j.id = jes.jugador_id
         JOIN ${sql(equiposTable)}    e   ON e.id = jes.equipo_id
         ${whereTeam}
         ${orderPoints}
       `;
+  
       const players = await sql`${query}`;
       return players;
     } catch (error: any) {
