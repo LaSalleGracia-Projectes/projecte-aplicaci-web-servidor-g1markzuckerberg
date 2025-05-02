@@ -56,4 +56,17 @@ async function uploadTeamsToSupabase(teams: Team[]): Promise<void> {
     }
 }
 
-export { getTeamsByCurrentSeason, uploadTeamsToSupabase };
+async function getTeamsFromSupabase(): Promise<Team[]> {
+    try {
+        const results = await sql<Team[]>`
+            SELECT id, name, "imagePath"
+            FROM ${sql(equiposTable)}
+        `;
+        return results;
+    } catch (error: any) {
+        console.error("Error obteniendo equipos desde Supabase:", error);
+        throw new Error(`Error obteniendo equipos desde Supabase: ${error.message}`);
+    }
+}
+
+export { getTeamsByCurrentSeason, uploadTeamsToSupabase, getTeamsFromSupabase };

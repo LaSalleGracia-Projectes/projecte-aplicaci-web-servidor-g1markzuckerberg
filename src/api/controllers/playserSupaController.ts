@@ -2,7 +2,7 @@ import { type Request, type Response, type NextFunction } from 'express';
 import httpStatus from '../config/httpStatusCodes.js';
 import { getAllPlayersFromSupabase, getPlayerByIdFromSupabase } from '../../services/playerService.js';
 import type Player from '../../types/Player.js';
-
+import { getTeamsFromSupabase } from '../../services/teamService.js';
 /**
  * Controlador para obtener todos los jugadores desde Supabase.
  */
@@ -58,4 +58,16 @@ async function getPlayerById(req: Request, res: Response, next: NextFunction): P
   }
 }
 
-export { getAllPlayersSupa, getPlayerById };
+/**
+ * Controlador para obtener todos los equipos desde Supabase.
+ */
+async function getAllTeams(req: Request, res: Response, next: NextFunction): Promise<void> {
+  try {
+    const teams = await getTeamsFromSupabase();
+    res.status(httpStatus.ok).json({ teams });
+  } catch (error: unknown) {
+    next(error);
+  }
+}
+
+export { getAllPlayersSupa, getPlayerById, getAllTeams };
