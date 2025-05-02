@@ -6,7 +6,7 @@ import authMiddleware from '../middlewares/authMiddleware.js';
 import validate from '../middlewares/joiValidation.js';
 import { createLigaSchema } from '../models/Joi/ligaSchemas.js';
 import { uploadLeagueImage } from '../middlewares/multerLeagueMiddleware.js'; // Asegúrate de que la ruta sea correcta
-
+import { getAllTeams } from '../controllers/playserSupaController.js';
 const ligaRouter = Router();
 ligaRouter.post(
   '/create',
@@ -35,9 +35,11 @@ ligaRouter.put(
 
 ligaRouter.get('/image/:ligaId', getLeagueImageController);
 
-// Ejemplo de URL: /api/v1/ligas/123/user/456
+// Ejemplo de URL: /api/v1/liga/123/user/456
 ligaRouter.get('/:leagueId/user/:userId', authMiddleware, getUserFromLeagueController);
 
 ligaRouter.put('/update-name/:ligaId', authMiddleware, updateLigaNameController);
+
+ligaRouter.get('/teams', getAllTeams);
 
 export default ligaRouter;
