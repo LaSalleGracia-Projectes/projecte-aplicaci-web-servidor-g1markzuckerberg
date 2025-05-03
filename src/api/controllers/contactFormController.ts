@@ -1,6 +1,6 @@
 import { type Request, type Response, type NextFunction } from 'express';
 import httpStatus from '../config/httpStatusCodes.js';
-import { createContactForm, getAllContactForms, updateContactForm } from '../../services/databaseMongoService.js';
+import { createContactForm, getAllContactForms, updateContactForm} from '../../services/databaseMongoService.js';
 
 /**
  * Controller para la creación de un formulario de contacto.
@@ -27,56 +27,86 @@ const createContactFormController = async (req: Request, res: Response, next: Ne
 
 /**
  * Controller para obtener todos los formularios de contacto.
- * Solo se permite acceder a esta operación si el usuario es administrador.
+ * Solo administradores (verificado por el servicio) pueden acceder.
  */
-const getAllContactFormsController = async (req: Request, res: Response, next: NextFunction) => {
+const getAllContactFormsController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
-    const { user } = res.locals as { user?: { correo?: string } };
-    if (!user?.correo) {
-      return res.status(httpStatus.unauthorized).json({ error: "No está autenticado" });
+    const { user } = res.locals as { user?: { id: number; correo: string; is_admin: boolean } };
+    if (!user?.id) {
+      return res.status(httpStatus.unauthorized).json({ error: 'No está autenticado' });
     }
-    
-    const { correo } = user;
-    const contactForms = await getAllContactForms({ correo });
-    return res.status(httpStatus.ok).json(contactForms);
-  } catch (error) {
+
+    const forms = await getAllContactForms(user.id);
+    return res.status(httpStatus.ok).json(forms);
+  } catch (error: any) {
+    if (error.message.startsWith('No autorizado')) {
+      return res.status(httpStatus.unauthorized).json({ error: error.message });
+    }
     next(error);
   }
 };
 
 /**
  * Controller para actualizar el campo "resolved" de un formulario de contacto.
- * Solo se permite actualizar este campo y solo si el usuario es administrador.
+ * Solo administradores y solo el campo "resolved".
  */
-const updateContactFormController = async (req: Request, res: Response, next: NextFunction) => {
+const updateContactFormController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
   try {
-    const { user } = res.locals as { user?: { correo?: string } };
-    if (!user?.correo) {
-      return res.status(httpStatus.unauthorized).json({ error: "No está autenticado" });
+    // Extraemos el adminId de res.locals (inyectado por authMiddleware)
+    const { user } = res.locals as { user?: { id?: number; correo?: string; is_admin?: boolean } };
+    if (!user?.id) {
+      return res
+        .status(httpStatus.unauthorized)
+        .json({ error: 'No está autenticado' });
     }
-    
-    // Se espera que el identificador del formulario venga en los parámetros de la URL.
+
+    // Validamos que nos pasen el ID del formulario
     const { id } = req.params;
     if (!id) {
-      return res.status(httpStatus.badRequest).json({ error: "Falta el identificador del formulario" });
+      return res
+        .status(httpStatus.badRequest)
+        .json({ error: 'Falta el identificador del formulario' });
     }
-    
-    // Solo se permite actualizar el campo "resolved".
-    interface UpdateContactFormRequestBody {
+
+    // Solo permitimos el campo "resolved" en el body
+    interface UpdateBody {
       resolved: boolean;
     }
-    const { resolved } = req.body as UpdateContactFormRequestBody;
+    const { resolved } = req.body as UpdateBody;
     if (resolved === undefined) {
-      return res.status(httpStatus.badRequest).json({ error: 'El campo "resolved" es requerido' });
+      return res
+        .status(httpStatus.badRequest)
+        .json({ error: 'El campo "resolved" es requerido' });
     }
-    
-    const updatedForm = await updateContactForm({ correo: user.correo }, id, { resolved });
-    if (!updatedForm) {
-      return res.status(httpStatus.notFound).json({ error: "Formulario no encontrado" });
+
+    // Llamada al servicio, que internamente validará is_admin en Supabase
+    const updated = await updateContactForm(user.id, id, { resolved });
+
+    if (!updated) {
+      return res
+        .status(httpStatus.notFound)
+        .json({ error: 'Formulario no encontrado' });
     }
-    
-    return res.status(httpStatus.ok).json(updatedForm);
-  } catch (error) {
+
+    return res
+      .status(httpStatus.ok)
+      .json(updated);
+
+  } catch (error: any) {
+    // Si el servicio lanza "No autorizado", devolvemos 403
+    if (error.message.includes('No autorizado')) {
+      return res
+        .status(httpStatus.unauthorized)
+        .json({ error: error.message });
+    }
     next(error);
   }
 };

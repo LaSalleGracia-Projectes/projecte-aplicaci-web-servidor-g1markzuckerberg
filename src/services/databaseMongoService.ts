@@ -2,6 +2,8 @@ import { type Document } from 'mongoose';
 import type ContactForm from '../types/ContactFormMongo.js';
 import type UserI from '../types/UserI.js';
 import contactFormModel from '../models/ContactFormSchema.js';
+import { sql } from './supabaseService.js';
+import { userTable } from '../models/User.js';
 
 /**
  * Crea un nuevo formulario de contacto.
@@ -30,15 +32,21 @@ const createContactForm = async (
 
 /**
  * Obtiene todos los formularios de contacto.
- * Esta operación solo puede realizarse por un usuario administrador.
+ * Solo administradores (verificado en Supabase) pueden llamarlo.
  *
- * @param user - Objeto usuario obtenido de res.locals (debe tener is_admin true).
- * @returns Lista de formularios de contacto ordenados desde el más reciente al más antiguo.
+ * @param adminId - ID del usuario que hace la petición (de res.locals).
  */
 const getAllContactForms = async (
-  user: UserI
+  adminId: number
 ): Promise<Array<ContactForm & Document>> => {
-  if (!user.is_admin) {
+  // Verificar en Supabase si es admin
+  const [admin] = await sql<Array<{ is_admin: boolean }>>`
+    SELECT is_admin
+    FROM ${sql(userTable)}
+    WHERE id = ${adminId}
+    LIMIT 1;
+  `;
+  if (!admin || !admin.is_admin) {
     throw new Error('No autorizado: Solo administradores pueden obtener todos los formularios.');
   }
 
@@ -51,41 +59,47 @@ const getAllContactForms = async (
 
 /**
  * Actualiza el campo "resolved" de un formulario de contacto.
- * Esta operación solo puede realizarla un administrador y únicamente se permite actualizar el campo "resolved".
+ * Solo administradores (verificado en Supabase) y solo el campo "resolved".
  *
- * @param user - Objeto usuario obtenido de res.locals (debe tener is_admin true).
- * @param id - Identificador del formulario a actualizar.
- * @param updateData - Objeto con el campo "resolved" a actualizar (ejemplo: { resolved: true }).
- * @returns El formulario de contacto actualizado o null en caso de no encontrarlo.
+ * @param adminId - ID del usuario que hace la petición (de res.locals).
+ * @param id - ID del formulario de contacto en Mongo.
+ * @param updateData - { resolved: boolean }.
  */
 const updateContactForm = async (
-  user: UserI,
+  adminId: number,
   id: string,
   updateData: Partial<ContactForm>
 ): Promise<(ContactForm & Document) | undefined> => {
-  if (!user.is_admin) {
+  // Verificar en Supabase si es admin
+  const [admin] = await sql<Array<{ is_admin: boolean }>>`
+    SELECT is_admin
+    FROM ${sql(userTable)}
+    WHERE id = ${adminId}
+    LIMIT 1;
+  `;
+  if (!admin || !admin.is_admin) {
     throw new Error('No autorizado: Solo administradores pueden actualizar formularios.');
   }
 
-  // Validar que únicamente se actualice el campo "resolved"
+  // Validar que solo venga "resolved"
   const allowedKeys = ['resolved'];
   const updateKeys = Object.keys(updateData);
   if (updateKeys.length === 0) {
     throw new Error('Debe incluir al menos el campo "resolved" para actualizar.');
   }
 
-  const invalidKeys = updateKeys.filter(key => !allowedKeys.includes(key));
-  if (invalidKeys.length > 0) {
+  const invalid = updateKeys.filter(k => !allowedKeys.includes(k));
+  if (invalid.length > 0) {
     throw new Error('Solo se permite actualizar el campo "resolved".');
   }
 
   try {
-    const updatedForm = await contactFormModel.findByIdAndUpdate(
+    const updated = await contactFormModel.findByIdAndUpdate(
       id,
       { $set: updateData },
       { new: true }
     );
-    return updatedForm ?? undefined;
+    return updated ?? undefined;
   } catch (error) {
     throw new Error(error instanceof Error ? error.message : String(error));
   }
