@@ -68,6 +68,7 @@ const adminGetUserByIdController = async (req: Request, res: Response, next: Nex
 
     // Retornamos solo los campos editables
     const editableUser = {
+      id: user.id,
       username: user.username,
       birthDate: user.birthDate,
       // eslint-disable-next-line @typescript-eslint/naming-convention
