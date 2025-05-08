@@ -180,17 +180,19 @@ async function getAllPlayersFromSupabase(
           j.id, 
           j."displayName", 
           j."positionId", 
-          j."imagePath"    AS "playerImage",
-          j.puntos_totales AS "points",
-          e.id             AS "teamId",
-          e.name           AS "teamName",
-          e."imagePath"    AS "teamImage"
+          j."imagePath"     AS "playerImage",
+          j.puntos_totales  AS "points",
+          j.estrellas       AS "estrellas",      -- <-- añadimos estrellas
+          e.id              AS "teamId",
+          e.name            AS "teamName",
+          e."imagePath"     AS "teamImage"
         FROM ${sql(jugadoresTable)} j
         JOIN ${sql(jugadoresEquipos)} jes ON j.id = jes.jugador_id
         JOIN ${sql(equiposTable)}    e   ON e.id = jes.equipo_id
         ${whereTeam}
         ${orderPoints}
       `;
+  
       const players = await sql`${query}`;
       return players;
     } catch (error: any) {
@@ -210,27 +212,29 @@ async function getAllPlayersFromSupabase(
  */
 async function getPlayerByIdFromSupabase(playerId: number): Promise<any> {
     try {
-    const [player] = await sql`
+      const [player] = await sql`
         SELECT 
-            j.id, 
-            j."displayName", 
-            j."positionId", 
-            j."imagePath" AS "playerImage",
-            e.id        AS "teamId",
-            e.name      AS "teamName",
-            e."imagePath" AS "teamImage"
+          j.id, 
+          j."displayName", 
+          j."positionId", 
+          j."imagePath" AS "playerImage",
+          j."puntos_totales" AS "points",         -- <-- añadimos puntos
+          j.estrellas,
+          e.id        AS "teamId",
+          e.name      AS "teamName",
+          e."imagePath" AS "teamImage"
         FROM ${sql(jugadoresTable)} j
         JOIN ${sql(jugadoresEquipos)} jes ON j.id = jes.jugador_id
         JOIN ${sql(equiposTable)} e ON e.id = jes.equipo_id
         WHERE j.id = ${playerId}
         LIMIT 1
-        `;
-
-    return player;
+      `;
+  
+      return player;
     } catch (error: any) {
-        throw new Error(`Error obteniendo jugador con id ${playerId} de Supabase: ${error.message}`);
+      throw new Error(`Error obteniendo jugador con id ${playerId} de Supabase: ${error.message}`);
     }
-}
+  }
 
 export { getAllPlayersFromTeams, uploadPlayersToSupabase, uploadJugadorEquipoSeasonRelation,
     getAllPlayersFromSupabase, getPlayerByIdFromSupabase };
