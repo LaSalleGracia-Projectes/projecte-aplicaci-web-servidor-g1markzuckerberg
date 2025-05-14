@@ -386,18 +386,18 @@ export async function getPlantillaWithPlayers(
   // 5. Por cada jugador, consulta sus puntos en la jornadaId y los añade
   const players = await Promise.all(
     jugadores.map(async (player) => {
-      const [{ puntos = 0 }] = await sql<
-        Array<{ puntos: number }>
-      >`
+      const puntosQuery = await sql<Array<{ puntos: number }>>`
         SELECT COALESCE(points, 0) AS puntos
         FROM ${sql("jornada_jugador")}
         WHERE jugador_id = ${player.id}
           AND jornada_id = ${jornadaId}
         LIMIT 1
       `;
+
+      const puntos = puntosQuery.length > 0 ? puntosQuery[0].puntos : 0;
+
       return {
         ...player,
-        // eslint-disable-next-line @typescript-eslint/naming-convention
         puntos_jornada: puntos,
       };
     })
