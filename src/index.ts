@@ -89,7 +89,7 @@ const startServer = async () => {
     // Iniciar el servidor HTTP
     httpServer.listen(port, () => {
       console.log(`⚡️[server]: Server is running at http://localhost:${port}`);
-      // AstartJornadaCronJob();
+      startJornadaCronJob();
     });
 
     return sql;
