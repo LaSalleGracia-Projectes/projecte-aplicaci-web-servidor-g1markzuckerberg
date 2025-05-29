@@ -91,3 +91,50 @@ export async function deleteNewPlayer(id: number): Promise<void> {
     WHERE id = ${id}
   `;
 }
+
+/**
+ * Actualiza un jugador existente por ID, recibiendo nombre de equipo, posición, nombre e imagen.
+ */
+export async function updateNewPlayer(
+  id:         number,
+  teamName:   string,
+  positionId: PositionId,
+  name:       string,
+  imageUrl?:  string
+): Promise<NewPlayer> {
+  // existe?
+  const existing = await getNewPlayerById(id);
+  if (!existing) {
+    throw new Error(`No existe jugador con id=${id}`);
+  }
+  // posición válida
+  if (!ALLOWED_POSITIONS.includes(positionId)) {
+    throw new Error(`positionId inválido. Solo: ${ALLOWED_POSITIONS.join(', ')}`);
+  }
+  // lookup equipo
+  const teams = await sql<{ id: number }[]>`
+    SELECT id FROM ${sql(equiposTable)} WHERE name = ${teamName}
+  `;
+  if (teams.length === 0) {
+    throw new Error(`Equipo no encontrado: "${teamName}"`);
+  }
+  const equipoId = teams[0].id;
+
+  // update
+  const [updated] = await sql<NewPlayer[]>`
+    UPDATE ${sql(newPlayersTable)}
+    SET
+      equipo_id   = ${equipoId},
+      position_id = ${positionId},
+      name        = ${name},
+      image_url   = ${imageUrl ?? null}
+    WHERE id = ${id}
+    RETURNING
+      id,
+      equipo_id   AS equipoId,
+      position_id AS positionId,
+      name,
+      image_url   AS imageUrl
+  `;
+  return updated;
+}
