@@ -119,3 +119,34 @@ export const updateNewPlayerController = async (
     next(err);
   }
 };
+
+/**
+ * DELETE /new-players/:id
+ */
+export const deleteNewPlayerController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    if (!ensureAdmin(res)) {
+      return res
+        .status(httpStatus.unauthorized)
+        .json({ error: 'Unauthorized: admin only' });
+    }
+    const id = Number(req.params.id);
+    // confirm existence
+    const existing = await getNewPlayerById(id);
+    if (!existing) {
+      return res
+        .status(httpStatus.notFound)
+        .json({ error: `Player with id=${id} not found` });
+    }
+    await deleteNewPlayer(id);
+    res
+      .status(httpStatus.ok)
+      .json({ message: `Player with id=${id} deleted successfully` });
+  } catch (err) {
+    next(err);
+  }
+};
