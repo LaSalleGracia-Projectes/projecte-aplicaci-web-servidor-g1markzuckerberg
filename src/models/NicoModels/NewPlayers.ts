@@ -1,0 +1,1 @@
+export const newPlayersTable = 'new_players';
