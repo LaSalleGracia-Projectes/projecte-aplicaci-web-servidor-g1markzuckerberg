@@ -10,6 +10,7 @@ import playerRouter from './routers/playerRouter.js';
 import draftRouter from './routers/draftRouter.js';
 import contactFormRouter from './routers/contactFormRouter.js';
 import grafanaRouter from './routers/grafanaRouter.js';
+import newPlayerRouter from './routers/NicoRouter/NicoRouter.js';
 
 const apiRouter = Router();
 
@@ -37,5 +38,7 @@ apiRouter.use('/draft', draftRouter);
 apiRouter.use('/contactForm', contactFormRouter);
 
 apiRouter.use('/grafana', grafanaRouter);
+
+apiRouter.use('/new-players', newPlayerRouter);
 
 export default apiRouter;
