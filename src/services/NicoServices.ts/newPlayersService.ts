@@ -64,3 +64,20 @@ export async function getAllNewPlayers(): Promise<NewPlayer[]> {
     FROM ${sql(newPlayersTable)}
   `;
 }
+
+/**
+ * Devuelve un jugador por su ID o null si no existe.
+ */
+export async function getNewPlayerById(id: number): Promise<NewPlayer | null> {
+  const [player] = await sql<NewPlayer[]>`
+    SELECT
+      id,
+      equipo_id   AS equipoId,
+      position_id AS positionId,
+      name,
+      image_url   AS imageUrl
+    FROM ${sql(newPlayersTable)}
+    WHERE id = ${id}
+  `;
+  return player ?? null;
+}
