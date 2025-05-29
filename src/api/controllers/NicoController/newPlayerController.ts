@@ -33,3 +33,31 @@ export const getAllNewPlayersController = async (
     next(err);
   }
 };
+
+
+/**
+ * GET /new-players/:id
+ */
+export const getNewPlayerByIdController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    if (!ensureAdmin(res)) {
+      return res
+        .status(httpStatus.unauthorized)
+        .json({ error: 'Unauthorized: admin only' });
+    }
+    const id = Number(req.params.id);
+    const player = await getNewPlayerById(id);
+    if (!player) {
+      return res
+        .status(httpStatus.notFound)
+        .json({ error: `Player with id=${id} not found` });
+    }
+    res.status(httpStatus.ok).json({ player });
+  } catch (err) {
+    next(err);
+  }
+};
