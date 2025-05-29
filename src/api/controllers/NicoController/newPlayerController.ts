@@ -61,3 +61,25 @@ export const getNewPlayerByIdController = async (
     next(err);
   }
 };
+
+/**
+ * POST /new-players
+ */
+export const createNewPlayerController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    if (!ensureAdmin(res)) {
+      return res
+        .status(httpStatus.unauthorized)
+        .json({ error: 'Unauthorized: admin only' });
+    }
+    const { teamName, positionId, name, imageUrl } = req.body;
+    const player = await createNewPlayer(teamName, positionId, name, imageUrl);
+    res.status(httpStatus.created).json({ player });
+  } catch (err: any) {
+    next(err);
+  }
+};
