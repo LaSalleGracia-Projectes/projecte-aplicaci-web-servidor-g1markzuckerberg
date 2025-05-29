@@ -81,3 +81,13 @@ export async function getNewPlayerById(id: number): Promise<NewPlayer | null> {
   `;
   return player ?? null;
 }
+
+/**
+ * Elimina un jugador por ID.
+ */
+export async function deleteNewPlayer(id: number): Promise<void> {
+  await sql`
+    DELETE FROM ${sql(newPlayersTable)}
+    WHERE id = ${id}
+  `;
+}
