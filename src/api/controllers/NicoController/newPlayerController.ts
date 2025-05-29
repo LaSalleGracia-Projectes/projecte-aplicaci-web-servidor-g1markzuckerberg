@@ -83,3 +83,39 @@ export const createNewPlayerController = async (
     next(err);
   }
 };
+
+/**
+ * PUT /new-players/:id
+ */
+export const updateNewPlayerController = async (
+  req: Request,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    if (!ensureAdmin(res)) {
+      return res
+        .status(httpStatus.unauthorized)
+        .json({ error: 'Unauthorized: admin only' });
+    }
+    const id = Number(req.params.id);
+    const { teamName, positionId, name, imageUrl } = req.body;
+
+    const updated = await updateNewPlayer(
+      id,
+      teamName,
+      positionId,
+      name,
+      imageUrl
+    );
+    res.status(httpStatus.ok).json({ player: updated });
+  } catch (err: any) {
+    if (
+      err instanceof Error &&
+      err.message.startsWith('No existe jugador con id=')
+    ) {
+      return res.status(httpStatus.notFound).json({ error: err.message });
+    }
+    next(err);
+  }
+};
