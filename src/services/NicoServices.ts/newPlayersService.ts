@@ -49,3 +49,18 @@ export async function createNewPlayer(
 
   return created;
 }
+
+/**
+ * Devuelve todos los jugadores.
+ */
+export async function getAllNewPlayers(): Promise<NewPlayer[]> {
+  return await sql<NewPlayer[]>`
+    SELECT
+      id,
+      equipo_id   AS equipoId,
+      position_id AS positionId,
+      name,
+      image_url   AS imageUrl
+    FROM ${sql(newPlayersTable)}
+  `;
+}
