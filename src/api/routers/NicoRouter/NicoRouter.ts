@@ -7,6 +7,11 @@ import {
   updateNewPlayerController,
   deleteNewPlayerController
 } from '../../controllers/NicoController/newPlayerController.js';
+import {
+  createNewPlayerSchema,
+  updateNewPlayerSchema
+} from '../../models/Joi/newPlayerSchemas.js';
+import validate from '../../middlewares/joiValidation.js';
 
 const newPlayerRouter = Router();
 
@@ -27,14 +32,14 @@ newPlayerRouter.get(
 // Crear un nuevo jugador (body: { teamName, positionId, name, imageUrl? })
 newPlayerRouter.post(
   '/create',
-  authMiddleware,
+  validate(createNewPlayerSchema, 'body'),
   createNewPlayerController
 );
 
 // Actualizar un jugador existente (body: { teamName, positionId, name, imageUrl? })
 newPlayerRouter.put(
   '/update/:id',
-  authMiddleware,
+  validate(updateNewPlayerSchema, 'body'),
   updateNewPlayerController
 );
 
