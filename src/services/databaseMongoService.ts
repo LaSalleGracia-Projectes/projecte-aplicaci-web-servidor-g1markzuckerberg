@@ -4,30 +4,77 @@ import type UserI from '../types/UserI.js';
 import contactFormModel from '../models/ContactFormSchema.js';
 import { sql } from './supabaseService.js';
 import { userTable } from '../models/User.js';
+import nodemailer, { Transporter } from 'nodemailer';
+
+const fromEmail = process.env.EMAIL_USER;
+const fromPass = process.env.EMAIL_PASS;
 
 /**
- * Crea un nuevo formulario de contacto.
- * Esta operación es pública, ya que el correo se obtiene desde res.locals y el usuario ingresa el mensaje.
+ * Crea un nuevo formulario de contacto y envía un email con el mensaje.
  *
- * @param correo - Correo del usuario, obtenido de res.locals.
+ * @param correo  - Correo del usuario, obtenido de res.locals.
  * @param mensaje - Mensaje escrito por el usuario.
- * @returns El formulario de contacto guardado en la base de datos.
+ * @returns El formulario guardado en MongoDB.
+ * @throws Error si falla el guardado o el envío de email.
  */
 const createContactForm = async (
   correo: string,
   mensaje: string
 ): Promise<ContactForm & Document> => {
-  try {
-    // eslint-disable-next-line new-cap
-    const newContactForm = new contactFormModel({
-      correo,
-      mensaje,
-      resolved: false
-    });
-    return await newContactForm.save();
-  } catch (error) {
-    throw new Error(error instanceof Error ? error.message : String(error));
+  if (!fromEmail || !fromPass) {
+    throw new Error('Faltan credenciales de email (EMAIL_USER/EMAIL_PASS).');
   }
+
+  // 1) Guardar en MongoDB
+  let savedForm: ContactForm & Document;
+  try {
+    const newForm = new contactFormModel({ correo, mensaje, resolved: false });
+    savedForm = await newForm.save();
+  } catch (error) {
+    throw new Error(
+      error instanceof Error ? error.message : 'Error guardando formulario.'
+    );
+  }
+
+  // 2) Configurar y enviar email
+  let transporter: Transporter;
+  try {
+    transporter = nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: fromEmail,
+        pass: fromPass
+      },
+      tls: {
+        // <<< Esto permite certificados autofirmados
+        rejectUnauthorized: false
+      }
+    });
+
+    // opcional: verifica conexión antes de enviar
+    await transporter.verify();
+
+    await transporter.sendMail({
+      from: `"Soporte FantasyDraft" <${fromEmail}>`,
+      to: fromEmail,
+      replyTo: correo,
+      subject: `Nuevo mensaje de contacto de ${correo}`,
+      html: `
+        <p><strong>Correo del usuario:</strong> ${correo}</p>
+        <p><strong>Mensaje:</strong></p>
+        <blockquote style="border-left:2px solid #ccc;padding-left:10px;">
+          ${mensaje.replace(/\n/g, '<br>')}
+        </blockquote>
+        <hr>
+        <p>Puedes <strong>responder directamente</strong> a este email y llegará al usuario.</p>
+      `
+    });
+  } catch (err) {
+    console.error('❌ Error enviando email de contacto:', err);
+    throw new Error('Formulario guardado, pero no se pudo enviar el email.');
+  }
+
+  return savedForm;
 };
 
 /**
