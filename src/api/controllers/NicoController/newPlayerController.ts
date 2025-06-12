@@ -1,17 +1,12 @@
 import { Request, Response, NextFunction } from 'express';
 import httpStatus from '../../config/httpStatusCodes.js';
 import {
-  createNewPlayer,
-  getAllNewPlayers,
-  getNewPlayerById,
-  updateNewPlayer,
-  deleteNewPlayer
+  getAllNewPlayersService,
+  getNewPlayerByIdService,
+  createNewPlayerService,
+  updateNewPlayerService,
+  deleteNewPlayerService
 } from '../../../services/NicoServices/newPlayersService.js';
-
-const ensureAdmin = (res: Response): boolean => {
-  const user = res.locals.user as { id: number; is_admin: boolean };
-  return user?.is_admin === true;
-};
 
 /**
  * GET /new-players
@@ -22,42 +17,34 @@ export const getAllNewPlayersController = async (
   next: NextFunction
 ) => {
   try {
-    if (!ensureAdmin(res)) {
-      return res
-        .status(httpStatus.unauthorized)
-        .json({ error: 'Unauthorized: admin only' });
-    }
-    const players = await getAllNewPlayers();
+    const players = await getAllNewPlayersService();
     res.status(httpStatus.ok).json({ players });
-  } catch (err) {
+  } catch (err: any) {
     next(err);
   }
 };
-
 
 /**
  * GET /new-players/:id
  */
 export const getNewPlayerByIdController = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
+  req:   Request,
+  res:   Response,
+  next:  NextFunction
 ) => {
   try {
-    if (!ensureAdmin(res)) {
-      return res
-        .status(httpStatus.unauthorized)
-        .json({ error: 'Unauthorized: admin only' });
-    }
     const id = Number(req.params.id);
-    const player = await getNewPlayerById(id);
+    if (isNaN(id)) {
+      return res.status(httpStatus.badRequest).json({ error: 'El parámetro id debe ser un número válido.' });
+    }
+    const player = await getNewPlayerByIdService(id);
     if (!player) {
       return res
         .status(httpStatus.notFound)
         .json({ error: `Player with id=${id} not found` });
     }
     res.status(httpStatus.ok).json({ player });
-  } catch (err) {
+  } catch (err: any) {
     next(err);
   }
 };
@@ -66,18 +53,18 @@ export const getNewPlayerByIdController = async (
  * POST /new-players
  */
 export const createNewPlayerController = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
+  req:   Request,
+  res:   Response,
+  next:  NextFunction
 ) => {
   try {
-    if (!ensureAdmin(res)) {
-      return res
-        .status(httpStatus.unauthorized)
-        .json({ error: 'Unauthorized: admin only' });
-    }
-    const { teamName, positionId, name, imageUrl } = req.body;
-    const player = await createNewPlayer(teamName, positionId, name, imageUrl);
+    const { equipo_id, position_id, displayname, imagepath } = req.body;
+    const player = await createNewPlayerService(
+      equipo_id,
+      position_id,
+      displayname,
+      imagepath
+    );
     res.status(httpStatus.created).json({ player });
   } catch (err: any) {
     next(err);
@@ -88,33 +75,29 @@ export const createNewPlayerController = async (
  * PUT /new-players/:id
  */
 export const updateNewPlayerController = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
+  req:   Request,
+  res:   Response,
+  next:  NextFunction
 ) => {
   try {
-    if (!ensureAdmin(res)) {
-      return res
-        .status(httpStatus.unauthorized)
-        .json({ error: 'Unauthorized: admin only' });
-    }
     const id = Number(req.params.id);
-    const { teamName, positionId, name, imageUrl } = req.body;
-
-    const updated = await updateNewPlayer(
+    if (isNaN(id)) {
+      return res.status(httpStatus.badRequest).json({ error: 'El parámetro id debe ser un número válido.' });
+    }
+    const { equipo_id, position_id, displayname, imagepath } = req.body;
+    const updated = await updateNewPlayerService(
       id,
-      teamName,
-      positionId,
-      name,
-      imageUrl
+      equipo_id,
+      position_id,
+      displayname,
+      imagepath
     );
     res.status(httpStatus.ok).json({ player: updated });
   } catch (err: any) {
-    if (
-      err instanceof Error &&
-      err.message.startsWith('No existe jugador con id=')
-    ) {
-      return res.status(httpStatus.notFound).json({ error: err.message });
+    if (err instanceof Error && err.message.startsWith('No existe jugador con id=')) {
+      return res
+        .status(httpStatus.notFound)
+        .json({ error: err.message });
     }
     next(err);
   }
@@ -124,29 +107,22 @@ export const updateNewPlayerController = async (
  * DELETE /new-players/:id
  */
 export const deleteNewPlayerController = async (
-  req: Request,
-  res: Response,
-  next: NextFunction
+  req:   Request,
+  res:   Response,
+  next:  NextFunction
 ) => {
   try {
-    if (!ensureAdmin(res)) {
-      return res
-        .status(httpStatus.unauthorized)
-        .json({ error: 'Unauthorized: admin only' });
-    }
     const id = Number(req.params.id);
-    // confirm existence
-    const existing = await getNewPlayerById(id);
-    if (!existing) {
+    const deleted = await deleteNewPlayerService(id);
+    if (!deleted) {
       return res
         .status(httpStatus.notFound)
         .json({ error: `Player with id=${id} not found` });
     }
-    await deleteNewPlayer(id);
     res
       .status(httpStatus.ok)
       .json({ message: `Player with id=${id} deleted successfully` });
-  } catch (err) {
+  } catch (err: any) {
     next(err);
   }
 };

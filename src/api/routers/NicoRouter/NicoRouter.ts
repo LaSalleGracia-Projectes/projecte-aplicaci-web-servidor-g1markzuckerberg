@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import authMiddleware from '../../../api/middlewares/authMiddleware.js';
 import {
   getAllNewPlayersController,
   getNewPlayerByIdController,
@@ -18,17 +17,10 @@ const newPlayerRouter = Router();
 // Obtener todos los jugadores manuales
 newPlayerRouter.get(
   '/',
-  authMiddleware,
   getAllNewPlayersController
 );
 
-// Obtener un jugador por ID
-newPlayerRouter.get(
-  '/:id',
-  authMiddleware,
-  getNewPlayerByIdController
-);
-
+// ===== RUTAS ESPECÍFICAS PRIMERO =====
 // Crear un nuevo jugador (body: { teamName, positionId, name, imageUrl? })
 newPlayerRouter.post(
   '/create',
@@ -46,8 +38,14 @@ newPlayerRouter.put(
 // Eliminar un jugador por ID
 newPlayerRouter.delete(
   '/delete/:id',
-  authMiddleware,
   deleteNewPlayerController
+);
+
+// ===== RUTA CON PARÁMETRO AL FINAL =====
+// Obtener un jugador por ID (IMPORTANTE: debe ir al final para evitar conflictos)
+newPlayerRouter.get(
+  '/:id',
+  getNewPlayerByIdController
 );
 
 export default newPlayerRouter;

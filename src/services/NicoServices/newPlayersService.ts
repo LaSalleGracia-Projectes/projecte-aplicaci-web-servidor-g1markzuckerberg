@@ -1,81 +1,35 @@
-import { sql }                    from '../supabaseService.js';
-import { newPlayersTable }        from '../../models/NicoModels/NewPlayers.js';
-import { equiposTable }           from '../../models/EquipoSupabase.js';
-import NewPlayer, { PositionId }  from '../../types/NicoTypes/NewPlayer.js';
-
-const ALLOWED_POSITIONS: PositionId[] = [24, 25, 26, 27];
+import { sql } from '../supabaseService.js';
+import { newPlayersTable } from '../../models/NicoModels/NewPlayers.js';
+import NewPlayer from '../../types/NicoTypes/NewPlayer.js';
 
 /**
- * Crea un jugador manual en new_players usando el nombre del equipo.
- * @throws Error si positionId no válido o equipo no existe.
+ * Obtiene todos los jugadores (público)
  */
-export async function createNewPlayer(
-  teamName:   string,
-  positionId: PositionId,
-  name:       string,
-  imageUrl?:  string
-): Promise<NewPlayer> {
-  // 1) Validar positionId
-  if (!ALLOWED_POSITIONS.includes(positionId)) {
-    throw new Error(
-      `positionId inválido. Solo se permiten: ${ALLOWED_POSITIONS.join(', ')}`
-    );
-  }
-
-  // 2) Buscar el equipo por nombre
-  const teams = await sql<{ id: number }[]>`
-    SELECT id
-    FROM ${sql(equiposTable)}
-    WHERE name = ${teamName}
-  `;
-  if (teams.length === 0) {
-    throw new Error(`No existe ningún equipo con nombre="${teamName}"`);
-  }
-  const equipoId = teams[0].id;
-
-  // 3) Insertar el nuevo jugador
-  const [created] = await sql<NewPlayer[]>`
-    INSERT INTO ${sql(newPlayersTable)}
-      (equipo_id, position_id, name, image_url)
-    VALUES
-      (${equipoId}, ${positionId}, ${name}, ${imageUrl ?? null})
-    RETURNING
-      id,
-      equipo_id   AS equipoId,
-      position_id AS positionId,
-      name,
-      image_url   AS imageUrl
-  `;
-
-  return created;
-}
-
-/**
- * Devuelve todos los jugadores.
- */
-export async function getAllNewPlayers(): Promise<NewPlayer[]> {
+export async function getAllNewPlayersService(): Promise<NewPlayer[]> {
   return await sql<NewPlayer[]>`
     SELECT
       id,
-      equipo_id   AS equipoId,
-      position_id AS positionId,
-      name,
-      image_url   AS imageUrl
+      equipo_id,
+      position_id,
+      displayname,
+      imagepath
     FROM ${sql(newPlayersTable)}
   `;
 }
 
 /**
- * Devuelve un jugador por su ID o null si no existe.
+ * Obtiene un jugador por su ID (público)
  */
-export async function getNewPlayerById(id: number): Promise<NewPlayer | null> {
+export async function getNewPlayerByIdService(
+  id: number
+): Promise<NewPlayer | null> {
   const [player] = await sql<NewPlayer[]>`
     SELECT
       id,
-      equipo_id   AS equipoId,
-      position_id AS positionId,
-      name,
-      image_url   AS imageUrl
+      equipo_id,
+      position_id,
+      displayname,
+      imagepath
     FROM ${sql(newPlayersTable)}
     WHERE id = ${id}
   `;
@@ -83,58 +37,90 @@ export async function getNewPlayerById(id: number): Promise<NewPlayer | null> {
 }
 
 /**
- * Elimina un jugador por ID.
+ * Crea un jugador manual en new_players usando los campos directos (público)
  */
-export async function deleteNewPlayer(id: number): Promise<void> {
-  await sql`
-    DELETE FROM ${sql(newPlayersTable)}
-    WHERE id = ${id}
+export async function createNewPlayerService(
+  equipo_id:   number,
+  position_id: number,
+  displayname: string,
+  imagepath?:  string
+): Promise<NewPlayer> {
+  // Validar que el equipo existe por id
+  const [team] = await sql<{ id: number }[]>`
+    SELECT id FROM equipos WHERE id = ${equipo_id}
   `;
+  if (!team) {
+    throw new Error(`No existe ningún equipo con id="${equipo_id}"`);
+  }
+  const [created] = await sql<NewPlayer[]>`
+    INSERT INTO ${sql(newPlayersTable)}
+      (equipo_id, position_id, displayname, imagepath)
+    VALUES
+      (${equipo_id}, ${position_id}, ${displayname}, ${imagepath ?? null})
+    RETURNING
+      id,
+      equipo_id,
+      position_id,
+      displayname,
+      imagepath
+  `;
+  return created;
 }
 
 /**
- * Actualiza un jugador existente por ID, recibiendo nombre de equipo, posición, nombre e imagen.
+ * Actualiza un jugador existente por ID (público)
  */
-export async function updateNewPlayer(
-  id:         number,
-  teamName:   string,
-  positionId: PositionId,
-  name:       string,
-  imageUrl?:  string
+export async function updateNewPlayerService(
+  id:          number,
+  equipo_id:   number,
+  position_id: number,
+  displayname: string,
+  imagepath?:  string
 ): Promise<NewPlayer> {
-  // existe?
-  const existing = await getNewPlayerById(id);
+  // Verificar existencia del jugador
+  const [existing] = await sql<NewPlayer[]>`
+    SELECT id FROM ${sql(newPlayersTable)} WHERE id = ${id}
+  `;
   if (!existing) {
     throw new Error(`No existe jugador con id=${id}`);
   }
-  // posición válida
-  if (!ALLOWED_POSITIONS.includes(positionId)) {
-    throw new Error(`positionId inválido. Solo: ${ALLOWED_POSITIONS.join(', ')}`);
-  }
-  // lookup equipo
-  const teams = await sql<{ id: number }[]>`
-    SELECT id FROM ${sql(equiposTable)} WHERE name = ${teamName}
+  // Validar que el equipo existe por id
+  const [team] = await sql<{ id: number }[]>`
+    SELECT id FROM equipos WHERE id = ${equipo_id}
   `;
-  if (teams.length === 0) {
-    throw new Error(`Equipo no encontrado: "${teamName}"`);
+  if (!team) {
+    throw new Error(`No existe ningún equipo con id="${equipo_id}"`);
   }
-  const equipoId = teams[0].id;
-
-  // update
+  // Actualizar
   const [updated] = await sql<NewPlayer[]>`
     UPDATE ${sql(newPlayersTable)}
     SET
-      equipo_id   = ${equipoId},
-      position_id = ${positionId},
-      name        = ${name},
-      image_url   = ${imageUrl ?? null}
+      equipo_id   = ${equipo_id},
+      position_id = ${position_id},
+      displayname = ${displayname},
+      imagepath   = ${imagepath ?? null}
     WHERE id = ${id}
     RETURNING
       id,
-      equipo_id   AS equipoId,
-      position_id AS positionId,
-      name,
-      image_url   AS imageUrl
+      equipo_id,
+      position_id,
+      displayname,
+      imagepath
   `;
   return updated;
+}
+
+/**
+ * Elimina un jugador por ID (público)
+ * @returns true si se eliminó al menos un registro.
+ */
+export async function deleteNewPlayerService(
+  id: number
+): Promise<boolean> {
+  const result = await sql`
+    DELETE FROM ${sql(newPlayersTable)}
+    WHERE id = ${id}
+    RETURNING id;
+  `;
+  return result.length > 0;
 }
