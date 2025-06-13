@@ -8,12 +8,24 @@ const authMiddleware = (req: Request, res: Response, next: NextFunction) => {
     if (header[0] === 'Bearer') {
       const token = header[1];
       const secretKey = process.env.JWT_SECRET_KEY ?? 'secret';
-      const decoded = jwt.verify(token, secretKey);
-      if (decoded) {
-        // Send decoded data to the next middleware
-        res.locals.user = decoded;
-        next();
-        return;
+      try {
+        const decoded = jwt.verify(token, secretKey);
+        if (decoded && typeof decoded === 'object') {
+          // Normaliza los campos para que siempre haya correo, id, is_admin
+          const user = {
+            id: decoded.id,
+            correo: decoded.correo,
+            is_admin: decoded.is_admin ?? decoded.isAdmin ?? false
+          };
+          res.locals.user = user;
+          next();
+          return;
+        }
+      } catch (err) {
+        // Token inválido
+        return res.status(httpStatus.unauthorized).send({
+          error: 'Token inválido o expirado.'
+        });
       }
     }
   }
